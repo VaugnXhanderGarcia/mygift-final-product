@@ -1,0 +1,68 @@
+<div class="card p-3 mb-4">
+  <h4>{{editing ? 'Edit Product' : 'Add Product'}}</h4>
+
+  <form [formGroup]="form" (ngSubmit)="save()" class="row g-2">
+    <div class="col-md-2">
+      <input class="form-control" formControlName="name" placeholder="Name">
+    </div>
+
+    <div class="col-md-2">
+      <input class="form-control" formControlName="category" placeholder="Category">
+    </div>
+
+    <div class="col-md-2">
+      <input class="form-control" formControlName="price" type="number" placeholder="Price">
+    </div>
+
+    <div class="col-md-3">
+      <input class="form-control" formControlName="imageUrl" placeholder="Image URL">
+    </div>
+
+    <div class="col-md-2">
+      <input class="form-control" formControlName="description" placeholder="Description">
+    </div>
+
+    <div class="col-md-1">
+      <button class="btn btn-primary w-100" [disabled]="loading">
+        {{editing ? 'Update' : 'Add'}}
+      </button>
+    </div>
+
+    <div class="col-md-1" *ngIf="editing">
+      <button type="button" class="btn btn-secondary w-100" (click)="cancel()">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<div class="card p-3">
+  <h4>Products</h4>
+
+  <table class="table table-bordered table-striped mt-3">
+    <thead>
+      <tr>
+        <th>Image</th>
+        <th>Name</th>
+        <th>Category</th>
+        <th>Price</th>
+        <th>Available</th>
+        <th width="180">Action</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let product of products">
+        <td>
+          <img [src]="product.imageUrl" width="80" height="55" style="object-fit: cover;">
+        </td>
+        <td>{{product.name}}</td>
+        <td>{{product.category}}</td>
+        <td>₱{{product.price}}</td>
+        <td>{{product.isAvailable ? 'Yes' : 'No'}}</td>
+        <td>
+          <button class="btn btn-sm btn-warning me-2" (click)="edit(product)">Edit</button>
+          <button class="btn btn-sm btn-danger" (click)="deleteProduct(product.id)">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>

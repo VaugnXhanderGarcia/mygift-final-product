@@ -1,0 +1,13 @@
+body { background: #f7f7f7; } .pointer { cursor: pointer; } .card-img-top { height: 160px; object-fit: cover; background: #eee; }
+
+:root { --mygift-primary:#7c3aed; --mygift-dark:#201433; --mygift-soft:#f6f0ff; }
+body { background: linear-gradient(180deg, #fff7fb 0%, #f8f4ff 100%); min-height: 100vh; }
+.hero-section { background: linear-gradient(135deg, #7c3aed, #ec4899); }
+.product-card { border: 0; border-radius: 18px; overflow: hidden; }
+.product-img { height: 170px; object-fit: cover; }
+.order-panel { top: 90px; border: 0; border-radius: 18px; }
+.mygift-card { border: 0; border-radius: 18px; }
+.btn-primary { background-color: var(--mygift-primary); border-color: var(--mygift-primary); }
+.btn-outline-primary { color: var(--mygift-primary); border-color: var(--mygift-primary); }
+.btn-outline-primary:hover { background-color: var(--mygift-primary); border-color: var(--mygift-primary); }
+.navbar { background: var(--mygift-dark) !important; }

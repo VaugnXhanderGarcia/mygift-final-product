@@ -1,0 +1,71 @@
+<section class="mygift-hero-banner mb-4">
+  <div class="hero-overlay">
+    <div class="hero-content">
+      <h1>MyGift Lemonade and Snack Bar</h1>
+      <p>Scan, choose your lemonade or snacks, reserve pickup time, and pay at the counter.</p>
+    </div>
+
+    <div class="hero-qr-box">
+      <img [src]="qrUrl" alt="Customer Ordering QR">
+      <div>Customer Ordering QR</div>
+    </div>
+  </div>
+</section>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <button *ngFor="let category of categories" type="button" class="btn" [ngClass]="category === selectedCategory ? 'btn-primary' : 'btn-outline-primary'" (click)="selectedCategory = category">{{category}}</button>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6 col-xl-4" *ngFor="let product of filteredProducts">
+        <div class="card h-100 product-card shadow-sm">
+          <img [src]="product.imageUrl" class="card-img-top product-img" alt="{{product.name}}">
+          <div class="card-body">
+            <span class="badge bg-light text-dark mb-2">{{product.category}}</span>
+            <h5>{{product.name}}</h5>
+            <p class="text-muted small">{{product.description}}</p>
+            <div class="d-flex justify-content-between align-items-center">
+              <strong>₱{{product.price}}</strong>
+              <button class="btn btn-sm btn-primary" (click)="add(product)">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow sticky-top order-panel">
+      <div class="card-body">
+        <h4>Reservation Details</h4>
+        <form [formGroup]="form" (ngSubmit)="submit()">
+          <input class="form-control mb-2" formControlName="customerName" placeholder="Customer name">
+          <input class="form-control mb-2" formControlName="contactNumber" placeholder="Contact number">
+          <label class="form-label small">Pickup date</label>
+          <input class="form-control mb-2" type="date" formControlName="pickupDate">
+          <label class="form-label small">Pickup time</label>
+          <input class="form-control mb-2" type="time" formControlName="pickupTime">
+          <textarea class="form-control mb-3" rows="2" formControlName="notes" placeholder="Notes or customization request"></textarea>
+
+          <div *ngIf="cart.length === 0" class="alert alert-light border">No selected items yet.</div>
+          <div *ngFor="let item of cart" class="d-flex justify-content-between align-items-center border-bottom py-2">
+            <div><strong>{{item.productName}}</strong><br><small>₱{{item.price}} x {{item.quantity}}</small></div>
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary" (click)="decrease(item)">-</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="add({ id: item.productId, name: item.productName, price: item.price })">+</button>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between mt-3 fs-5"><strong>Total</strong><strong>₱{{total()}}</strong></div>
+          <div class="alert alert-info small mt-3 mb-3">Payment method: Pay at the counter upon claiming.</div>
+          <button class="btn btn-success w-100" [disabled]="loading">{{loading ? 'Submitting...' : 'Reserve Order'}}</button>
+        </form>
+
+        <div *ngIf="submittedOrder" class="alert alert-success mt-3">
+          Reservation received. Reference #: {{submittedOrder.id}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

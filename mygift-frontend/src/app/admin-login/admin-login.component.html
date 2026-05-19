@@ -1,0 +1,18 @@
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow mygift-card">
+      <div class="card-body p-4">
+        <h3 class="text-center mb-2">MyGift Admin Login</h3>
+        <p class="text-muted text-center">Manage reservations, products, and QR ordering.</p>
+        <form [formGroup]="form" (ngSubmit)="onSubmit()">
+          <label class="form-label">Email</label>
+          <input class="form-control mb-3" formControlName="email" placeholder="admin&#64;mygift.com">
+          <label class="form-label">Password</label>
+          <input class="form-control mb-3" type="password" formControlName="password" placeholder="admin123">
+          <button class="btn btn-primary w-100" [disabled]="loading">{{loading ? 'Signing in...' : 'Login'}}</button>
+        </form>
+        <p class="text-muted mt-3 small text-center">Default: admin&#64;mygift.com / admin123</p>
+      </div>
+    </div>
+  </div>
+</div>

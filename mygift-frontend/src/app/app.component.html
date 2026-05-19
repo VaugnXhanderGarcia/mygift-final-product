@@ -1,0 +1,21 @@
+<nav *ngIf="showAdminNavbar" class="navbar navbar-expand navbar-dark px-3" style="background:#1e0f33;">
+  <div class="navbar-nav me-auto">
+    <a routerLink="/admin" routerLinkActive="active" class="nav-item nav-link">Dashboard</a>
+    <a routerLink="/admin/orders" routerLinkActive="active" class="nav-item nav-link">Orders</a>
+    <a routerLink="/admin/products" routerLinkActive="active" class="nav-item nav-link">Products</a>
+    <a routerLink="/admin/profile" routerLinkActive="active" class="nav-item nav-link">Profile</a>
+  </div>
+
+  <div class="navbar-nav ms-auto align-items-center">
+    <span class="text-white me-3">
+      {{ account?.email }} - {{ account?.role }}
+    </span>
+    <button class="btn btn-link nav-item nav-link" (click)="logout()">Logout</button>
+  </div>
+</nav>
+
+<app-alert></app-alert>
+
+<div class="container-fluid py-4">
+  <router-outlet></router-outlet>
+</div>

@@ -1,0 +1,9 @@
+<h1>Orders</h1>
+<table class="table table-striped">
+  <thead><tr><th>Code</th><th>Customer</th><th>Pickup</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+  <tbody><tr *ngFor="let order of orders">
+    <td>{{order.orderCode}}</td><td>{{order.customerName}}<br><small>{{order.contactNumber}}</small></td><td>{{order.pickupDate}} {{order.pickupTime}}</td>
+    <td><div *ngFor="let item of order.items">{{item.productName}} x {{item.quantity}}</div></td><td>₱{{order.totalAmount}}</td>
+    <td><select class="form-select" [ngModel]="order.status" (ngModelChange)="update(order, $event)"><option *ngFor="let s of statuses">{{s}}</option></select></td>
+  </tr></tbody>
+</table>
