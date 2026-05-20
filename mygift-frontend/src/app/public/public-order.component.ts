@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { ProductService } from '../_services/product.service';
 import { OrderService } from '../_services/order.service';
@@ -8,16 +8,22 @@ import { OrderService } from '../_services/order.service';
   templateUrl: './public-order.component.html',
   styleUrls: ['./public-order.component.css']
 })
-export class PublicOrderComponent implements OnInit {
+export class PublicOrderComponent implements OnInit, OnDestroy {
   products: any[] = [];
   categories: string[] = ['All'];
   selectedCategory = 'All';
 
   cart: any[] = [];
   submittedOrder: any = null;
-  loading = false;
+  receiptOrder: any = null;
 
+  loading = false;
   qrUrl = '';
+
+  screen: 'order' | 'review' | 'receipt' = 'order';
+  countdown = 10;
+  receiptTimer: any = null;
+
   form!: FormGroup;
 
   selectedProduct: any = null;
@@ -43,6 +49,10 @@ export class PublicOrderComponent implements OnInit {
 
     this.generateQrCode();
     this.loadProducts();
+  }
+
+  ngOnDestroy(): void {
+    this.clearReceiptTimer();
   }
 
   generateQrCode(): void {
@@ -211,25 +221,21 @@ export class PublicOrderComponent implements OnInit {
     }
   }
 
+  increaseCartItem(item: any): void {
+    item.quantity += 1;
+    item.subtotal = item.price * item.quantity;
+  }
+
+  removeCartItem(item: any): void {
+    this.cart = this.cart.filter(cartItem => cartItem.productName !== item.productName);
+  }
+
   total(): number {
     return this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }
 
-  submit(): void {
-    this.submittedOrder = null;
-
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      alert('Please complete customer name, contact number, pickup date, and pickup time.');
-      return;
-    }
-
-    if (this.cart.length === 0) {
-      alert('Please select at least one product.');
-      return;
-    }
-
-    const payload = {
+  buildOrderPayload(): any {
+    return {
       customerName: this.form.value.customerName,
       contactNumber: this.form.value.contactNumber,
       pickupDate: this.form.value.pickupDate,
@@ -242,18 +248,60 @@ export class PublicOrderComponent implements OnInit {
         quantity: Number(item.quantity)
       }))
     };
+  }
+
+  submit(): void {
+    this.reviewOrder();
+  }
+
+  reviewOrder(): void {
+    this.submittedOrder = null;
+    this.receiptOrder = null;
+
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      alert('Please complete customer name, contact number, pickup date, and pickup time.');
+      return;
+    }
+
+    if (this.cart.length === 0) {
+      alert('Please select at least one product.');
+      return;
+    }
+
+    this.screen = 'review';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  backToOrder(): void {
+    this.screen = 'order';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  finishOrder(): void {
+    if (this.form.invalid || this.cart.length === 0) {
+      this.backToOrder();
+      return;
+    }
+
+    const payload = this.buildOrderPayload();
 
     this.loading = true;
 
     this.orderService.createPublic(payload).subscribe({
       next: (response: any) => {
         this.loading = false;
-        this.submittedOrder = response;
 
-        alert(`Reservation submitted successfully. Reference #: ${response.id}`);
+        this.receiptOrder = {
+          ...payload,
+          id: response.id,
+          createdAt: new Date()
+        };
 
-        this.form.reset();
-        this.cart = [];
+        this.screen = 'receipt';
+        this.startReceiptCountdown();
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       },
       error: (error: any) => {
         this.loading = false;
@@ -265,5 +313,47 @@ export class PublicOrderComponent implements OnInit {
         );
       }
     });
+  }
+
+  startReceiptCountdown(): void {
+    this.clearReceiptTimer();
+    this.countdown = 10;
+
+    this.receiptTimer = setInterval(() => {
+      this.countdown -= 1;
+
+      if (this.countdown <= 0) {
+        this.startNewOrder();
+      }
+    }, 1000);
+  }
+
+  clearReceiptTimer(): void {
+    if (this.receiptTimer) {
+      clearInterval(this.receiptTimer);
+      this.receiptTimer = null;
+    }
+  }
+
+  startNewOrder(): void {
+    this.clearReceiptTimer();
+
+    this.form.reset();
+    this.cart = [];
+    this.submittedOrder = null;
+    this.receiptOrder = null;
+    this.selectedCategory = 'All';
+    this.loading = false;
+    this.screen = 'order';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  skipReceiptTimer(): void {
+    this.startNewOrder();
+  }
+
+  getReceiptDate(): string {
+    return new Date().toLocaleString();
   }
 }
