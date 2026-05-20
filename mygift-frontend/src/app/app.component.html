@@ -1,21 +1,55 @@
-<nav *ngIf="showAdminNavbar" class="navbar navbar-expand navbar-dark px-3" style="background:#1e0f33;">
+<nav
+  *ngIf="showAdminNavbar"
+  class="navbar navbar-expand navbar-dark px-3"
+  style="background:#1e0f33;">
+
   <div class="navbar-nav me-auto">
-    <a routerLink="/admin" routerLinkActive="active" class="nav-item nav-link">Dashboard</a>
-    <a routerLink="/admin/orders" routerLinkActive="active" class="nav-item nav-link">Orders</a>
-    <a routerLink="/admin/products" routerLinkActive="active" class="nav-item nav-link">Products</a>
-    <a routerLink="/admin/profile" routerLinkActive="active" class="nav-item nav-link">Profile</a>
+    <a
+      routerLink="/admin"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="nav-item nav-link">
+      Dashboard
+    </a>
+
+    <a
+      routerLink="/admin/orders"
+      routerLinkActive="active"
+      class="nav-item nav-link">
+      Orders
+    </a>
+
+    <a
+      routerLink="/admin/products"
+      routerLinkActive="active"
+      class="nav-item nav-link">
+      Products
+    </a>
+
+    <a
+      routerLink="/admin/profile"
+      routerLinkActive="active"
+      class="nav-item nav-link">
+      Profile
+    </a>
   </div>
 
   <div class="navbar-nav ms-auto align-items-center">
-    <span class="text-white me-3">
+    <span class="navbar-text text-white me-3">
       {{ account?.email }} - {{ account?.role }}
     </span>
-    <button class="btn btn-link nav-item nav-link" (click)="logout()">Logout</button>
+
+    <button
+      type="button"
+      class="btn btn-link nav-item nav-link text-white"
+      (click)="logout()">
+      Logout
+    </button>
   </div>
 </nav>
 
 <app-alert></app-alert>
 
-<div class="container-fluid py-4">
+<div [ngClass]="showAdminNavbar ? 'container-fluid py-4' : 'container-fluid p-0'">
   <router-outlet></router-outlet>
 </div>

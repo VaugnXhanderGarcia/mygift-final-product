@@ -2,15 +2,14 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { AccountService } from './_services/account.service';
 
-
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html'
 })
 export class AppComponent {
   constructor(
-    public accountService: AccountService,
-    public router: Router
+    private accountService: AccountService,
+    private router: Router
   ) {}
 
   get account() {
@@ -18,11 +17,10 @@ export class AppComponent {
   }
 
   get showAdminNavbar(): boolean {
-    const publicPages = ['/', '/order', '/public'];
-    return !!this.account && !publicPages.includes(this.router.url);
+    return !!this.account && this.router.url.startsWith('/admin');
   }
 
-  logout() {
+  logout(): void {
     this.accountService.logout();
   }
 }
