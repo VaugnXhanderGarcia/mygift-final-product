@@ -5,9 +5,7 @@ import { db } from '../_helpers/db';
 
 const router = express.Router();
 
-const ACTIVE_STATUSES = ['Pending', 'Preparing', 'Ready for Pickup'];
-
-function includeOrderItems() {
+function includeItems() {
   return [
     {
       model: db.OrderItem,
@@ -16,8 +14,49 @@ function includeOrderItems() {
   ];
 }
 
+function normalizeName(name: any): string {
+  return String(name || '').trim().toLowerCase();
+}
+
+function customerNameWhere(customerName: string) {
+  return db.sequelize.where(
+    db.sequelize.fn('LOWER', db.sequelize.col('customerName')),
+    normalizeName(customerName)
+  );
+}
+
 function makeOrderCode() {
   return `MG-${Date.now()}`;
+}
+
+async function getOrderWithItems(orderId: number) {
+  return db.Order.findByPk(orderId, {
+    include: includeItems()
+  });
+}
+
+async function recalculateOrderTotal(orderId: number, transaction?: any) {
+  const items = await db.OrderItem.findAll({
+    where: { orderId },
+    transaction
+  });
+
+  const totalAmount = items.reduce((sum: number, item: any) => {
+    if (item.status === 'Cancelled') {
+      return sum;
+    }
+
+    return sum + Number(item.subtotal || 0);
+  }, 0);
+
+  const order = await db.Order.findByPk(orderId, { transaction });
+
+  if (order) {
+    order.totalAmount = totalAmount;
+    await order.save({ transaction });
+  }
+
+  return totalAmount;
 }
 
 /**
@@ -37,49 +76,38 @@ router.post('/public', async (req, res, next) => {
       items
     } = req.body;
 
-    const cleanCustomerName = String(customerName || '').trim();
-
-    if (!cleanCustomerName || !contactNumber || !pickupDate || !pickupTime) {
-      await transaction.rollback();
-
-      return res.status(400).json({
-        message: 'Customer name, contact number, pickup date, and pickup time are required.'
-      });
+    if (!customerName || !contactNumber || !pickupDate || !pickupTime) {
+      throw new Error('Customer name, contact number, pickup date, and pickup time are required.');
     }
 
     if (!Array.isArray(items) || items.length === 0) {
-      await transaction.rollback();
-
-      return res.status(400).json({
-        message: 'Please select at least one product.'
-      });
+      throw new Error('Please select at least one product.');
     }
 
-    const existingActiveOrder = await db.Order.findOne({
+    const activeExistingOrder = await db.Order.findOne({
       where: {
-        customerName: cleanCustomerName,
         status: {
-          [Op.in]: ACTIVE_STATUSES
-        }
+          [Op.in]: ['Pending', 'Preparing', 'Ready for Pickup']
+        },
+        [Op.and]: [customerNameWhere(customerName)]
       },
       transaction
     });
 
-    if (existingActiveOrder) {
+    if (activeExistingOrder) {
       await transaction.rollback();
 
       return res.status(409).json({
-        message: 'This customer name already has an active order. Please track the existing order first or use a different name.'
+        message: `The name "${customerName}" already has an active order. Please track your existing order first.`,
+        orderCode: activeExistingOrder.orderCode
       });
     }
-
-    let totalAmount = 0;
 
     const order = await db.Order.create(
       {
         orderCode: makeOrderCode(),
-        customerName: cleanCustomerName,
-        contactNumber,
+        customerName: String(customerName).trim(),
+        contactNumber: String(contactNumber).trim(),
         pickupDate,
         pickupTime,
         notes: notes || '',
@@ -91,19 +119,21 @@ router.post('/public', async (req, res, next) => {
       { transaction }
     );
 
+    let totalAmount = 0;
+
     for (const item of items) {
       const product = await db.Product.findByPk(item.productId, { transaction });
 
       if (!product) {
-        throw `Product not found: ${item.productName || item.productId}`;
+        throw new Error(`Product not found: ${item.productName || item.productId}`);
       }
 
       if (product.isAvailable === false) {
-        throw `Product is unavailable: ${product.name}`;
+        throw new Error(`${product.name} is currently not available.`);
       }
 
       const quantity = Number(item.quantity || 1);
-      const unitPrice = Number(item.price ?? product.price);
+      const unitPrice = Number(item.price || item.unitPrice || product.price);
       const subtotal = unitPrice * quantity;
 
       totalAmount += subtotal;
@@ -111,11 +141,12 @@ router.post('/public', async (req, res, next) => {
       await db.OrderItem.create(
         {
           orderId: order.id,
-          productId: product.id,
+          productId: item.productId,
           productName: item.productName || product.name,
-          quantity,
           unitPrice,
-          subtotal
+          quantity,
+          subtotal,
+          status: 'Active'
         },
         { transaction }
       );
@@ -126,14 +157,12 @@ router.post('/public', async (req, res, next) => {
 
     await transaction.commit();
 
-    const savedOrder = await db.Order.findByPk(order.id, {
-      include: includeOrderItems()
-    });
+    const savedOrder = await getOrderWithItems(order.id);
 
     return res.status(201).json({
       message: 'Reservation submitted successfully.',
-      id: savedOrder.id,
-      orderCode: savedOrder.orderCode,
+      id: order.id,
+      orderCode: order.orderCode,
       order: savedOrder
     });
   } catch (error) {
@@ -146,10 +175,9 @@ router.post('/public', async (req, res, next) => {
 });
 
 /**
- * PUBLIC ORDER TRACKING
- * URL: GET /orders/track/:orderCode?customerName=Juan
+ * PUBLIC: TRACK ORDER BY CUSTOMER NAME ONLY
+ * URL: GET /orders/track-by-name?customerName=Juan
  */
-
 router.get('/track-by-name', async (req, res, next) => {
   try {
     const customerName = String(req.query.customerName || '').trim();
@@ -162,9 +190,11 @@ router.get('/track-by-name', async (req, res, next) => {
 
     const order = await db.Order.findOne({
       where: {
-        customerName
+        status: {
+          [Op.in]: ['Pending', 'Preparing', 'Ready for Pickup', 'Completed']
+        },
+        [Op.and]: [customerNameWhere(customerName)]
       },
-      include: includeOrderItems(),
       order: [['createdAt', 'DESC']]
     });
 
@@ -174,17 +204,22 @@ router.get('/track-by-name', async (req, res, next) => {
       });
     }
 
-    return res.json(order);
+    const fullOrder = await getOrderWithItems(order.id);
+
+    res.json(fullOrder);
   } catch (error) {
     next(error);
   }
 });
+
+/**
+ * PUBLIC: TRACK ORDER BY REFERENCE + NAME
+ * URL: GET /orders/track/:orderCode?customerName=Juan
+ */
 router.get('/track/:orderCode', async (req, res, next) => {
   try {
     const orderCode = String(req.params.orderCode || '').trim();
-    const customerName = String(
-      req.query.customerName || req.query.name || ''
-    ).trim();
+    const customerName = String(req.query.customerName || '').trim();
 
     if (!orderCode || !customerName) {
       return res.status(400).json({
@@ -195,9 +230,8 @@ router.get('/track/:orderCode', async (req, res, next) => {
     const order = await db.Order.findOne({
       where: {
         orderCode,
-        customerName
-      },
-      include: includeOrderItems()
+        [Op.and]: [customerNameWhere(customerName)]
+      }
     });
 
     if (!order) {
@@ -206,7 +240,9 @@ router.get('/track/:orderCode', async (req, res, next) => {
       });
     }
 
-    return res.json(order);
+    const fullOrder = await getOrderWithItems(order.id);
+
+    res.json(fullOrder);
   } catch (error) {
     next(error);
   }
@@ -219,42 +255,11 @@ router.get('/track/:orderCode', async (req, res, next) => {
 router.get('/', authorize, async (req, res, next) => {
   try {
     const orders = await db.Order.findAll({
-      include: includeOrderItems(),
+      include: includeItems(),
       order: [['createdAt', 'DESC']]
     });
 
-    return res.json(orders);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * ADMIN: UPDATE ORDER ITEM PREPARED STATUS
- * URL: PATCH /orders/:orderId/items/:itemId/prepared
- */
-router.patch('/:orderId/items/:itemId/prepared', authorize, async (req, res, next) => {
-  try {
-    const item = await db.OrderItem.findOne({
-      where: {
-        id: req.params.itemId,
-        orderId: req.params.orderId
-      }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        message: 'Order item not found.'
-      });
-    }
-
-    item.set('isPrepared', Boolean(req.body.isPrepared));
-    await item.save();
-
-    return res.json({
-      message: 'Item preparation status updated successfully.',
-      item
-    });
+    res.json(orders);
   } catch (error) {
     next(error);
   }
@@ -265,45 +270,87 @@ router.patch('/:orderId/items/:itemId/prepared', authorize, async (req, res, nex
  * URL: PUT /orders/:id/status
  */
 router.put('/:id/status', authorize, async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
   try {
     const order = await db.Order.findByPk(req.params.id, {
-      include: includeOrderItems()
+      include: includeItems(),
+      transaction
     });
 
     if (!order) {
+      await transaction.rollback();
+
       return res.status(404).json({
         message: 'Order not found.'
       });
     }
 
-    const newStatus = String(req.body.status || '').trim();
+    const nextStatus = req.body.status;
+    const preparedItemIds = Array.isArray(req.body.preparedItemIds)
+      ? req.body.preparedItemIds.map((id: any) => Number(id))
+      : [];
 
-    const allowedStatuses = [
-      'Pending',
-      'Preparing',
-      'Ready for Pickup',
-      'Completed',
-      'Cancelled'
-    ];
+    const bypassChecklist = req.body.bypassChecklist === true;
 
-    if (!allowedStatuses.includes(newStatus)) {
-      return res.status(400).json({
-        message: 'Invalid order status.'
-      });
+    if (!nextStatus) {
+      throw new Error('Status is required.');
     }
 
-    order.status = newStatus;
-    await order.save();
+    const validStatuses = ['Pending', 'Preparing', 'Ready for Pickup', 'Completed', 'Cancelled'];
 
-    const updatedOrder = await db.Order.findByPk(req.params.id, {
-      include: includeOrderItems()
-    });
+    if (!validStatuses.includes(nextStatus)) {
+      throw new Error('Invalid order status.');
+    }
 
-    return res.json({
+    const activeItems = order.items.filter((item: any) => item.status !== 'Cancelled');
+
+    if (order.status === 'Preparing' && nextStatus === 'Ready for Pickup') {
+      const uncheckedItems = activeItems.filter(
+        (item: any) => !preparedItemIds.includes(Number(item.id))
+      );
+
+      if (uncheckedItems.length > 0 && !bypassChecklist) {
+        await transaction.rollback();
+
+        return res.status(400).json({
+          message: 'Please check all ordered products before moving this order to Ready for Pickup.'
+        });
+      }
+
+      if (uncheckedItems.length > 0 && bypassChecklist) {
+        for (const item of uncheckedItems) {
+          item.status = 'Cancelled';
+          await item.save({ transaction });
+        }
+      }
+    }
+
+    if (nextStatus === 'Cancelled') {
+      for (const item of activeItems) {
+        item.status = 'Cancelled';
+        await item.save({ transaction });
+      }
+    }
+
+    await recalculateOrderTotal(order.id, transaction);
+
+    order.status = nextStatus;
+    await order.save({ transaction });
+
+    await transaction.commit();
+
+    const updatedOrder = await getOrderWithItems(order.id);
+
+    res.json({
       message: 'Order status updated successfully.',
       order: updatedOrder
     });
   } catch (error) {
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+
     next(error);
   }
 });

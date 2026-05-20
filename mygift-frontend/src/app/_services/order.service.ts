@@ -20,17 +20,17 @@ export class OrderService {
     return this.http.get<any[]>(`${API_URL}/orders`);
   }
 
-  updateStatus(id: number, status: string) {
+  updateStatus(
+    id: number,
+    status: string,
+    preparedItemIds: number[] = [],
+    bypassChecklist: boolean = false
+  ) {
     return this.http.put<any>(`${API_URL}/orders/${id}/status`, {
-      status
+      status,
+      preparedItemIds,
+      bypassChecklist
     });
-  }
-
-  updateItemPrepared(orderId: number, itemId: number, isPrepared: boolean) {
-    return this.http.patch<any>(
-      `${API_URL}/orders/${orderId}/items/${itemId}/prepared`,
-      { isPrepared }
-    );
   }
 
   trackByReference(orderCode: string, customerName: string) {

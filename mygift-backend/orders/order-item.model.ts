@@ -40,11 +40,10 @@ export default function orderItemModel(sequelize: Sequelize) {
         allowNull: false
       },
 
-      isPrepared: {
-        type: DataTypes.BOOLEAN,
+      status: {
+        type: DataTypes.STRING,
         allowNull: false,
-        defaultValue: false,
-        field: 'is_prepared'
+        defaultValue: 'Active'
       }
     },
     {
