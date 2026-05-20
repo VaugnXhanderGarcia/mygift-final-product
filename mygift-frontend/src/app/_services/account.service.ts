@@ -1,71 +1,43 @@
 import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
-
-import { environment } from '../../environments/environment';
+import { BehaviorSubject, Observable, map } from 'rxjs';
+import { Router } from '@angular/router';
+import { API_URL } from '../_helpers/api-url';
 
 @Injectable({ providedIn: 'root' })
 export class AccountService {
-  private accountSubject: BehaviorSubject<any>;
-  public account: Observable<any>;
+  private adminSubject: BehaviorSubject<any | null>;
+  public admin: Observable<any | null>;
 
-  constructor(
-    private router: Router,
-    private http: HttpClient
-  ) {
-    this.accountSubject = new BehaviorSubject<any>(
-      JSON.parse(localStorage.getItem('account') || 'null')
+  constructor(private http: HttpClient, private router: Router) {
+    this.adminSubject = new BehaviorSubject<any | null>(
+      JSON.parse(localStorage.getItem('mygiftAdmin') || 'null')
     );
-
-    this.account = this.accountSubject.asObservable();
+    this.admin = this.adminSubject.asObservable();
   }
 
-  get accountValue() {
-    return this.accountSubject.value;
-  }
-
-  get adminValue() {
-    return this.accountSubject.value;
+  public get adminValue() {
+    return this.adminSubject.value;
   }
 
   login(email: string, password: string) {
-    return this.http.post<any>(`${environment.apiUrl}/auth/login`, { email, password })
-      .pipe(map(account => {
-        localStorage.setItem('account', JSON.stringify(account));
-        this.accountSubject.next(account);
-        return account;
-      }));
+    return this.http.post<any>(`${API_URL}/auth/login`, { email, password }).pipe(
+      map(admin => {
+        localStorage.setItem('mygiftAdmin', JSON.stringify(admin));
+        this.adminSubject.next(admin);
+        return admin;
+      })
+    );
   }
 
   logout() {
-    localStorage.removeItem('account');
-    this.accountSubject.next(null);
+    localStorage.removeItem('mygiftAdmin');
+    this.adminSubject.next(null);
     this.router.navigate(['/admin/login']);
   }
 
-    updateProfile(currentPassword: string, newPassword: string) {
-    return this.http.put<any>(`${environment.apiUrl}/auth/profile`, {
-      currentPassword,
-      newPassword
-    }).pipe(map(account => {
-      if (account) {
-        const updatedAccount = {
-          ...this.accountValue,
-          ...account
-        };
-
-        localStorage.setItem('account', JSON.stringify(updatedAccount));
-        this.accountSubject.next(updatedAccount);
-      }
-
-      return account;
-    }));
-  }
-
   changePassword(currentPassword: string, newPassword: string) {
-    return this.http.put<any>(`${environment.apiUrl}/auth/profile`, {
+    return this.http.post<any>(`${API_URL}/auth/change-password`, {
       currentPassword,
       newPassword
     });

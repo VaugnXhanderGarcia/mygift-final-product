@@ -1,21 +1,20 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { API_URL } from '../_helpers/api-url';
 
 @Injectable({ providedIn: 'root' })
 export class OrderService {
-  private baseUrl = 'http://localhost:4000/orders';
-
   constructor(private http: HttpClient) {}
 
-  getAll() {
-    return this.http.get<any[]>(this.baseUrl);
+  createPublic(order: any) {
+    return this.http.post<any>(`${API_URL}/orders/public`, order);
   }
 
-  createPublic(order: any) {
-    return this.http.post(`${this.baseUrl}/public`, order);
+  getAll() {
+    return this.http.get<any[]>(`${API_URL}/orders`);
   }
 
   updateStatus(id: number, status: string) {
-    return this.http.put(`${this.baseUrl}/${id}/status`, { status });
+    return this.http.put<any>(`${API_URL}/orders/${id}/status`, { status });
   }
 }
