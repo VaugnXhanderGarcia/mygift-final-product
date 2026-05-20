@@ -269,7 +269,7 @@
 
       <div class="receipt-reference">
         Reference No.
-        <strong>#{{ receiptOrder.id }}</strong>
+        <strong>{{ receiptOrder.orderCode || receiptOrder.id }}</strong>
       </div>
 
       <div class="receipt-info">
@@ -304,6 +304,12 @@
         Thank you for your order. Please screenshot or save this receipt.
       </div>
 
+      <a
+  class="btn btn-success w-100 mt-3"
+  [routerLink]="['/track-order']"
+  [queryParams]="{ reference: receiptOrder.orderCode || receiptOrder.id }">
+  Track My Order
+</a>
       <div class="countdown-box mt-4">
         <p>
           Starting a new order in <strong>{{ countdown }}</strong> seconds...

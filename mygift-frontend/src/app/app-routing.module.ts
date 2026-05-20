@@ -7,9 +7,11 @@ import { AdminProductsComponent } from './admin-products/admin-products.componen
 import { AdminOrdersComponent } from './admin-orders/admin-orders.component';
 import { AdminProfileComponent } from './admin-profile/admin-profile.component';
 import { AuthGuard } from './_helpers/auth.guard';
+import { TrackOrderComponent } from './track-order/track-order.component';
 
 const routes: Routes = [
   { path: '', component: PublicOrderComponent },
+  { path: 'track-order', component: TrackOrderComponent },
   { path: 'admin/login', component: AdminLoginComponent },
   { path: 'admin', component: AdminDashboardComponent, canActivate: [AuthGuard] },
   { path: 'admin/products', component: AdminProductsComponent, canActivate: [AuthGuard] },

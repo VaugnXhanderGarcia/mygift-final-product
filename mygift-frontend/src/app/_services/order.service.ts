@@ -17,4 +17,10 @@ export class OrderService {
   updateStatus(id: number, status: string) {
     return this.http.put<any>(`${API_URL}/orders/${id}/status`, { status });
   }
+
+  trackOrder(orderCode: string, contactNumber: string) {
+    return this.http.get<any>(
+      `${API_URL}/orders/track/${encodeURIComponent(orderCode)}?contactNumber=${encodeURIComponent(contactNumber)}`
+    );
+  }
 }

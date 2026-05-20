@@ -292,11 +292,16 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
       next: (response: any) => {
         this.loading = false;
 
-        this.receiptOrder = {
-          ...payload,
-          id: response.id,
-          createdAt: new Date()
-        };
+        const savedOrder = response.order || response;
+
+this.receiptOrder = {
+  ...payload,
+  ...savedOrder,
+  id: savedOrder.id,
+  orderCode: savedOrder.orderCode,
+  items: payload.items,
+  createdAt: new Date()
+};
 
         this.screen = 'receipt';
         this.startReceiptCountdown();

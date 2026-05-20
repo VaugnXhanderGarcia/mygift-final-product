@@ -1,0 +1,105 @@
+<div class="track-wrapper">
+  <div class="card track-card shadow-sm">
+    <div class="card-body">
+      <h2 class="text-center mb-2">Track My Order</h2>
+
+      <p class="text-muted text-center mb-4">
+        Enter your reference number and contact number to check your order status.
+      </p>
+
+      <form [formGroup]="form" (ngSubmit)="trackOrder()">
+        <label class="form-label">Reference Number</label>
+        <input
+          type="text"
+          class="form-control mb-2"
+          formControlName="orderCode"
+          placeholder="Example: MG-12345678"
+        >
+
+        <label class="form-label">Contact Number</label>
+        <input
+          type="text"
+          class="form-control mb-3"
+          formControlName="contactNumber"
+          placeholder="Enter your contact number"
+        >
+
+        <button type="submit" class="btn btn-success w-100" [disabled]="loading">
+          <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+          {{ loading ? 'Checking...' : 'Track Order' }}
+        </button>
+      </form>
+
+      <div *ngIf="errorMessage" class="alert alert-danger mt-3">
+        {{ errorMessage }}
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="order" class="card track-result shadow mt-4">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+        <div>
+          <h4 class="mb-1">Reference #: {{ order.orderCode }}</h4>
+          <p class="text-muted mb-0">{{ order.customerName }}</p>
+        </div>
+
+        <span class="badge fs-6" [ngClass]="getStatusClass(order.status)">
+          {{ order.status }}
+        </span>
+      </div>
+
+      <div class="status-timeline mb-4" *ngIf="order.status !== 'Cancelled'">
+        <div
+          class="status-step"
+          *ngFor="let step of statusSteps"
+          [class.active]="isStepActive(step)">
+          <div class="circle"></div>
+          <span>{{ step }}</span>
+        </div>
+      </div>
+
+      <div *ngIf="order.status === 'Cancelled'" class="alert alert-danger">
+        This order has been cancelled.
+      </div>
+
+      <div class="order-info mb-3">
+        <p><strong>Contact:</strong> {{ order.contactNumber }}</p>
+        <p><strong>Pickup Date:</strong> {{ order.pickupDate }}</p>
+        <p><strong>Pickup Time:</strong> {{ order.pickupTime }}</p>
+        <p><strong>Payment:</strong> {{ order.paymentMethod }}</p>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Product</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr *ngFor="let item of order.items">
+              <td>{{ item.productName }}</td>
+              <td>{{ item.quantity }}</td>
+              <td>₱{{ item.unitPrice }}</td>
+              <td>₱{{ item.subtotal }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="track-total">
+        <span>Total</span>
+        <strong>₱{{ getTotal() }}</strong>
+      </div>
+
+      <p class="text-muted small text-center mt-3 mb-0">
+        Status refreshes automatically every 10 seconds while this page is open.
+      </p>
+    </div>
+  </div>
+</div>

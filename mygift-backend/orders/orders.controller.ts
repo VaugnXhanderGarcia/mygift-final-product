@@ -3,6 +3,15 @@ import { db } from '../_helpers/db';
 
 const router = express.Router();
 
+function getIncludeItems() {
+  return [
+    {
+      model: db.OrderItem,
+      as: 'items'
+    }
+  ];
+}
+
 /**
  * PUBLIC CUSTOMER ORDER
  * URL: POST http://localhost:4000/orders/public
@@ -44,21 +53,21 @@ router.post('/public', async (req, res, next) => {
 
     const orderCode = `MG-${Date.now()}`;
 
-const order = await db.Order.create(
-  {
-    orderCode,
-    customerName,
-    contactNumber,
-    pickupDate,
-    pickupTime,
-    notes: notes || '',
-    totalAmount,
-    status: 'Pending',
-    paymentMethod: 'Pay at Counter',
-    paymentStatus: 'Unpaid'
-  },
-  { transaction }
-);
+    const order = await db.Order.create(
+      {
+        orderCode,
+        customerName,
+        contactNumber,
+        pickupDate,
+        pickupTime,
+        notes: notes || '',
+        totalAmount,
+        status: 'Pending',
+        paymentMethod: 'Pay at Counter',
+        paymentStatus: 'Unpaid'
+      },
+      { transaction }
+    );
 
     for (const item of items) {
       await db.OrderItem.create(
@@ -76,17 +85,56 @@ const order = await db.Order.create(
 
     await transaction.commit();
 
+    const savedOrder = await db.Order.findByPk(order.id, {
+      include: getIncludeItems()
+    });
+
     return res.status(201).json({
-  message: 'Reservation submitted successfully.',
-  id: order.id,
-  orderCode: order.orderCode,
-  order
-});
+      message: 'Reservation submitted successfully.',
+      id: order.id,
+      orderCode: order.orderCode,
+      order: savedOrder
+    });
   } catch (error) {
     if (!transaction.finished) {
       await transaction.rollback();
     }
 
+    next(error);
+  }
+});
+
+/**
+ * PUBLIC: TRACK ORDER STATUS
+ * URL: GET http://localhost:4000/orders/track/MG-123456789?contactNumber=09123456789
+ */
+router.get('/track/:orderCode', async (req, res, next) => {
+  try {
+    const orderCode = String(req.params.orderCode || '').trim();
+    const contactNumber = String(req.query.contactNumber || '').trim();
+
+    if (!orderCode || !contactNumber) {
+      return res.status(400).json({
+        message: 'Reference number and contact number are required.'
+      });
+    }
+
+    const order = await db.Order.findOne({
+      where: {
+        orderCode,
+        contactNumber
+      },
+      include: getIncludeItems()
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'Order not found. Please check your reference number and contact number.'
+      });
+    }
+
+    return res.json(order);
+  } catch (error) {
     next(error);
   }
 });
@@ -98,16 +146,11 @@ const order = await db.Order.create(
 router.get('/', async (req, res, next) => {
   try {
     const orders = await db.Order.findAll({
-      include: [
-        {
-          model: db.OrderItem,
-          as: 'items'
-        }
-      ],
+      include: getIncludeItems(),
       order: [['createdAt', 'DESC']]
     });
 
-    res.json(orders);
+    return res.json(orders);
   } catch (error) {
     next(error);
   }
@@ -119,6 +162,14 @@ router.get('/', async (req, res, next) => {
  */
 router.put('/:id/status', async (req, res, next) => {
   try {
+    const allowedStatuses = [
+      'Pending',
+      'Preparing',
+      'Ready for Pickup',
+      'Completed',
+      'Cancelled'
+    ];
+
     const order = await db.Order.findByPk(req.params.id);
 
     if (!order) {
@@ -127,12 +178,24 @@ router.put('/:id/status', async (req, res, next) => {
       });
     }
 
-    order.status = req.body.status || order.status;
+    const newStatus = req.body.status;
+
+    if (!newStatus || !allowedStatuses.includes(newStatus)) {
+      return res.status(400).json({
+        message: 'Invalid order status.'
+      });
+    }
+
+    order.status = newStatus;
     await order.save();
 
-    res.json({
+    const updatedOrder = await db.Order.findByPk(order.id, {
+      include: getIncludeItems()
+    });
+
+    return res.json({
       message: 'Order status updated successfully.',
-      order
+      order: updatedOrder
     });
   } catch (error) {
     next(error);

@@ -14,10 +14,11 @@ import { AdminOrdersComponent } from './admin-orders/admin-orders.component';
 import { AdminProfileComponent } from './admin-profile/admin-profile.component';
 import { JwtInterceptor } from './_helpers/jwt.interceptor';
 import { ErrorInterceptor } from './_helpers/error.interceptor';
+import { TrackOrderComponent } from './track-order/track-order.component';
 
 
 @NgModule({
-  declarations: [AppComponent, AlertComponent, PublicOrderComponent, AdminLoginComponent, AdminDashboardComponent, AdminProductsComponent, AdminOrdersComponent, AdminProfileComponent],
+  declarations: [AppComponent, AlertComponent, PublicOrderComponent, AdminLoginComponent, AdminDashboardComponent, AdminProductsComponent, AdminOrdersComponent, AdminProfileComponent, TrackOrderComponent],
   imports: [BrowserModule, ReactiveFormsModule, FormsModule, HttpClientModule, RouterModule, AppRoutingModule],
   providers: [
     { provide: HTTP_INTERCEPTORS, useClass: JwtInterceptor, multi: true },

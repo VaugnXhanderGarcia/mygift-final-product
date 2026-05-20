@@ -1,0 +1,83 @@
+.track-wrapper {
+  min-height: 80vh;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.track-card,
+.track-result {
+  width: 100%;
+  max-width: 720px;
+  border-radius: 18px;
+}
+
+.status-timeline {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.status-step {
+  color: #adb5bd;
+  font-size: 0.85rem;
+  position: relative;
+}
+
+.status-step .circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #dee2e6;
+  margin: 0 auto 8px;
+}
+
+.status-step.active {
+  color: #198754;
+  font-weight: 600;
+}
+
+.status-step.active .circle {
+  background: #198754;
+}
+
+.order-info {
+  background: #f8fff9;
+  border: 1px solid #d8f3dc;
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.order-info p {
+  margin-bottom: 6px;
+}
+
+.track-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #198754;
+  color: white;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 576px) {
+  .status-timeline {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+
+  .status-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-step .circle {
+    margin: 0;
+  }
+}
