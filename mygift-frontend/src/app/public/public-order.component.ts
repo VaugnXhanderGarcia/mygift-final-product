@@ -17,8 +17,7 @@ export class PublicOrderComponent implements OnInit {
   submittedOrder: any = null;
   loading = false;
 
-  qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=http://localhost:4200';
-
+  qrUrl = '';
   form!: FormGroup;
 
   constructor(
@@ -36,7 +35,19 @@ export class PublicOrderComponent implements OnInit {
       notes: ['']
     });
 
+    this.generateQrCode();
     this.loadProducts();
+  }
+
+  generateQrCode(): void {
+    const customerOrderUrl =
+      window.location.hostname === 'localhost'
+        ? 'http://localhost:4200/'
+        : 'https://mygift-frontend.onrender.com/';
+
+    this.qrUrl =
+      'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' +
+      encodeURIComponent(customerOrderUrl);
   }
 
   loadProducts(): void {
@@ -138,7 +149,7 @@ export class PublicOrderComponent implements OnInit {
 
         alert(
           error?.error?.message ||
-          'Order failed. Please make sure the backend is running on http://localhost:4000.'
+          'Order failed. Please make sure the backend is running.'
         );
       }
     });
