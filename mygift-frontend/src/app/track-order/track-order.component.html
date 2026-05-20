@@ -21,6 +21,7 @@
             class="form-control"
             placeholder="Example: MG-1779258826211"
           />
+
           <small class="text-muted">
             Leave this blank if you forgot your reference number.
           </small>
@@ -33,7 +34,11 @@
             formControlName="customerName"
             class="form-control"
             placeholder="Enter the same name used in your order"
-            [ngClass]="{ 'is-invalid': form.get('customerName')?.invalid && form.get('customerName')?.touched }"
+            [ngClass]="{
+              'is-invalid':
+                form.get('customerName')?.invalid &&
+                form.get('customerName')?.touched
+            }"
           />
 
           <div class="invalid-feedback">
@@ -42,8 +47,11 @@
         </div>
 
         <button type="submit" class="btn btn-success w-100" [disabled]="loading">
-          <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
-          Track Order
+          <span
+            *ngIf="loading"
+            class="spinner-border spinner-border-sm me-1">
+          </span>
+          {{ loading ? 'Tracking...' : 'Track Order' }}
         </button>
       </form>
     </div>
@@ -66,7 +74,10 @@
         This order has been cancelled.
       </div>
 
-      <div class="d-flex justify-content-between text-center mb-4" *ngIf="order.status !== 'Cancelled'">
+      <div
+        class="d-flex justify-content-between text-center mb-4"
+        *ngIf="order.status !== 'Cancelled'">
+
         <div class="flex-fill" *ngFor="let step of statusSteps">
           <div
             class="rounded-circle mx-auto mb-2"

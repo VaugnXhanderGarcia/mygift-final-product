@@ -149,6 +149,40 @@ router.post('/public', async (req, res, next) => {
  * PUBLIC ORDER TRACKING
  * URL: GET /orders/track/:orderCode?customerName=Juan
  */
+
+router.get('/track-by-name', async (req, res, next) => {
+  try {
+    const customerName = String(req.query.customerName || '').trim();
+
+    if (!customerName) {
+      return res.status(400).json({
+        message: 'Customer name is required.'
+      });
+    }
+
+    const order = await db.Order.findOne({
+      where: {
+        customerName,
+        status: {
+          [Op.in]: ['Pending', 'Preparing', 'Ready for Pickup']
+        }
+      },
+      include: includeOrderItems(),
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'No active order found for this customer name.'
+      });
+    }
+
+    return res.json(order);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/track/:orderCode', async (req, res, next) => {
   try {
     const orderCode = String(req.params.orderCode || '').trim();

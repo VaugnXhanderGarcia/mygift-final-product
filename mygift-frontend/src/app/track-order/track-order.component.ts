@@ -28,25 +28,33 @@ export class TrackOrderComponent implements OnInit {
 
   ngOnInit(): void {
     const reference = this.route.snapshot.queryParamMap.get('reference') || '';
+    const customerName =
+      this.route.snapshot.queryParamMap.get('customerName') ||
+      this.route.snapshot.queryParamMap.get('name') ||
+      '';
 
     this.form = this.fb.group({
       reference: [reference],
-      customerName: ['', Validators.required]
+      customerName: [customerName, Validators.required]
     });
+
+    if (customerName) {
+      this.submit();
+    }
   }
 
   submit(): void {
     this.errorMessage = '';
     this.order = null;
 
-    if (this.form.invalid) {
+    const reference = String(this.form.value.reference || '').trim();
+    const customerName = String(this.form.value.customerName || '').trim();
+
+    if (!customerName) {
       this.form.markAllAsTouched();
       this.errorMessage = 'Please enter your customer name.';
       return;
     }
-
-    const reference = String(this.form.value.reference || '').trim();
-    const customerName = String(this.form.value.customerName || '').trim();
 
     this.loading = true;
 
@@ -55,17 +63,23 @@ export class TrackOrderComponent implements OnInit {
       : this.orderService.trackByName(customerName);
 
     request.subscribe({
-      next: order => {
+      next: (order: any) => {
         this.loading = false;
         this.order = order;
+        this.errorMessage = '';
       },
-      error: error => {
+      error: (error: any) => {
         this.loading = false;
+        this.order = null;
         this.errorMessage =
           error?.error?.message ||
           'Order not found. Please check your name or reference number.';
       }
     });
+  }
+
+  trackOrder(): void {
+    this.submit();
   }
 
   isStepDone(step: string): boolean {
