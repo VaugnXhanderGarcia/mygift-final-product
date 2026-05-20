@@ -105,10 +105,14 @@ export class AdminOrdersComponent implements OnInit {
     return this.getOrdersByStatus(status).length;
   }
 
-  updateStatus(order: any, status: string): void {
-    if (status === 'Ready for Pickup' && !this.canMoveToReady(order)) {
+  updateStatus(order: any, status: string, bypassChecklist = false): void {
+    if (
+      status === 'Ready for Pickup' &&
+      !this.canMoveToReady(order) &&
+      !bypassChecklist
+    ) {
       this.alertService.error(
-        'Please check all ordered products before moving this order to Ready for Pickup.'
+        'Please check all ordered products first, or use Bypass Continue if you need to proceed.'
       );
       return;
     }
@@ -126,8 +130,16 @@ export class AdminOrdersComponent implements OnInit {
     }
 
     this.orderService.updateStatus(order.id, status).subscribe({
-      next: () => {
-        order.status = status;
+      next: response => {
+        const updatedOrder = response?.order || {
+          ...order,
+          status
+        };
+
+        this.orders = this.orders.map(existingOrder =>
+          existingOrder.id === order.id ? updatedOrder : existingOrder
+        );
+
         this.selectedStatus = status;
 
         if (status === 'Ready for Pickup') {
@@ -157,6 +169,18 @@ export class AdminOrdersComponent implements OnInit {
       this.updateStatus(order, 'Completed');
       return;
     }
+  }
+
+  bypassToReadyForPickup(order: any): void {
+    const confirmed = confirm(
+      `Bypass product checklist and move order ${order.orderCode} to Ready for Pickup?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.updateStatus(order, 'Ready for Pickup', true);
   }
 
   getNextStatusLabel(order: any): string {
@@ -200,9 +224,9 @@ export class AdminOrdersComponent implements OnInit {
       return false;
     }
 
-    return order.items.every((item: any, index: number) => {
-      return this.isItemPrepared(order, item, index);
-    });
+    return order.items.every((item: any, index: number) =>
+      this.isItemPrepared(order, item, index)
+    );
   }
 
   isItemPrepared(order: any, item: any, index: number): boolean {
