@@ -162,10 +162,7 @@ router.get('/track-by-name', async (req, res, next) => {
 
     const order = await db.Order.findOne({
       where: {
-        customerName,
-        status: {
-          [Op.in]: ['Pending', 'Preparing', 'Ready for Pickup']
-        }
+        customerName
       },
       include: includeOrderItems(),
       order: [['createdAt', 'DESC']]
@@ -173,7 +170,7 @@ router.get('/track-by-name', async (req, res, next) => {
 
     if (!order) {
       return res.status(404).json({
-        message: 'No active order found for this customer name.'
+        message: 'Order not found. Please check your customer name.'
       });
     }
 
@@ -182,7 +179,6 @@ router.get('/track-by-name', async (req, res, next) => {
     next(error);
   }
 });
-
 router.get('/track/:orderCode', async (req, res, next) => {
   try {
     const orderCode = String(req.params.orderCode || '').trim();

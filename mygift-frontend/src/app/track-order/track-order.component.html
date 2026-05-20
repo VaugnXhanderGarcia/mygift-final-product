@@ -4,7 +4,7 @@
       <h2 class="text-center mb-2">Track Your Order</h2>
 
       <p class="text-center text-muted mb-4">
-        Enter your customer name to check your active order.
+        Enter your customer name to check your order.
         Reference number is optional but recommended.
       </p>
 
@@ -70,8 +70,23 @@
     </div>
 
     <div class="card-body">
-      <div *ngIf="order.status === 'Cancelled'" class="alert alert-danger">
-        This order has been cancelled.
+      <div *ngIf="order.status === 'Completed'" class="alert alert-success text-center">
+        <h4 class="mb-2">Order Completed</h4>
+        <p class="mb-3">
+          Thank you for ordering at MyGift Lemonade and Snack Bar.
+          Your order has been completed and claimed successfully.
+        </p>
+
+        <a routerLink="/" class="btn btn-success">
+          Order Again
+        </a>
+      </div>
+
+      <div *ngIf="order.status === 'Cancelled'" class="alert alert-danger text-center">
+        <h4 class="mb-2">Order Cancelled</h4>
+        <p class="mb-0">
+          This order has been cancelled.
+        </p>
       </div>
 
       <div
@@ -101,6 +116,10 @@
       </div>
 
       <div class="border rounded p-3 mb-3 bg-light">
+        <p class="mb-1">
+          <strong>Customer Name:</strong> {{ order.customerName }}
+        </p>
+
         <p class="mb-1">
           <strong>Contact:</strong> {{ order.contactNumber }}
         </p>
@@ -140,7 +159,12 @@
         </table>
       </div>
 
-      <div class="alert alert-success text-end mb-0">
+      <div
+        class="alert text-end mb-0"
+        [ngClass]="{
+          'alert-success': order.status === 'Completed',
+          'alert-primary': order.status !== 'Completed'
+        }">
         <strong>Total: ₱{{ formatMoney(order.totalAmount) }}</strong>
       </div>
     </div>
