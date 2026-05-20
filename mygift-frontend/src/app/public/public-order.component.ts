@@ -5,7 +5,8 @@ import { OrderService } from '../_services/order.service';
 
 @Component({
   selector: 'app-public-order',
-  templateUrl: './public-order.component.html'
+  templateUrl: './public-order.component.html',
+  styleUrls: ['./public-order.component.css']
 })
 export class PublicOrderComponent implements OnInit, OnDestroy {
   products: any[] = [];

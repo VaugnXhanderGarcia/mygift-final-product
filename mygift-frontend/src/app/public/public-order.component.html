@@ -12,10 +12,6 @@
         <a href="#order-section" class="btn btn-light btn-lg px-4">
           Start Ordering
         </a>
-
-        <a routerLink="/track-order" class="btn btn-outline-light btn-lg px-4">
-          Track Your Order
-        </a>
       </div>
     </div>
 
@@ -191,6 +187,10 @@
               Review Order
             </button>
           </form>
+
+          <a routerLink="/track-order" class="btn btn-outline-success w-100 mt-3">
+            Track Your Order
+          </a>
         </ng-container>
 
         <ng-container *ngIf="reviewMode && !receiptOrder">
@@ -263,6 +263,10 @@
               (click)="editOrder()">
               Add / Edit Order
             </button>
+
+            <a routerLink="/track-order" class="btn btn-outline-success">
+              Track Your Order
+            </a>
           </div>
         </ng-container>
 
