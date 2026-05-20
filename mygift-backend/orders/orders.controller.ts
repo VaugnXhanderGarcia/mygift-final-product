@@ -1,20 +1,20 @@
 import express from 'express';
-import authorize from '../_middleware/authorize';
+import { Op, fn, col, where } from 'sequelize';
 import { db } from '../_helpers/db';
 
 const router = express.Router();
 
-function getIncludeItems() {
-  return [
-    {
-      model: db.OrderItem,
-      as: 'items'
-    }
-  ];
-}
+const includeItems = [
+  {
+    model: db.OrderItem,
+    as: 'items'
+  }
+];
 
-function makeOrderCode() {
-  return `MG-${Date.now()}`;
+const inactiveStatuses = ['Completed', 'Cancelled'];
+
+function normalizeName(name: string) {
+  return String(name || '').trim().toLowerCase();
 }
 
 /**
@@ -34,7 +34,9 @@ router.post('/public', async (req, res, next) => {
       items
     } = req.body;
 
-    if (!customerName || !contactNumber || !pickupDate || !pickupTime) {
+    const cleanCustomerName = String(customerName || '').trim();
+
+    if (!cleanCustomerName || !contactNumber || !pickupDate || !pickupTime) {
       await transaction.rollback();
 
       return res.status(400).json({
@@ -42,7 +44,7 @@ router.post('/public', async (req, res, next) => {
       });
     }
 
-    if (!Array.isArray(items) || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
 
       return res.status(400).json({
@@ -50,58 +52,74 @@ router.post('/public', async (req, res, next) => {
       });
     }
 
+    const existingActiveOrder = await db.Order.findOne({
+      where: {
+        [Op.and]: [
+          where(fn('LOWER', col('customerName')), normalizeName(cleanCustomerName)),
+          {
+            status: {
+              [Op.notIn]: inactiveStatuses
+            }
+          }
+        ]
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (existingActiveOrder) {
+      await transaction.rollback();
+
+      return res.status(409).json({
+        message: `The name "${cleanCustomerName}" already has an active order. Please track your order first or wait until it is completed or cancelled.`,
+        orderCode: existingActiveOrder.orderCode
+      });
+    }
+
     let totalAmount = 0;
+
+    for (const item of items) {
+      totalAmount += Number(item.price) * Number(item.quantity);
+    }
+
+    const orderCode = `MG-${Date.now()}`;
 
     const order = await db.Order.create(
       {
-        orderCode: makeOrderCode(),
-        customerName,
+        orderCode,
+        customerName: cleanCustomerName,
         contactNumber,
         pickupDate,
         pickupTime,
         notes: notes || '',
-        paymentMethod: 'Pay at Counter',
+        totalAmount,
         status: 'Pending',
-        totalAmount: 0
+        paymentMethod: 'Pay at Counter',
+        paymentStatus: 'Unpaid'
       },
       { transaction }
     );
 
     for (const item of items) {
-      const quantity = Number(item.quantity || 1);
-      const unitPrice = Number(item.price || item.unitPrice || 0);
-      const subtotal = unitPrice * quantity;
-
-      totalAmount += subtotal;
-
       await db.OrderItem.create(
         {
           orderId: order.id,
           productId: item.productId,
           productName: item.productName,
-          quantity,
-          unitPrice,
-          subtotal,
-          isPrepared: false
+          unitPrice: Number(item.price),
+          quantity: Number(item.quantity),
+          subtotal: Number(item.price) * Number(item.quantity)
         },
         { transaction }
       );
     }
 
-    order.totalAmount = totalAmount;
-    await order.save({ transaction });
-
     await transaction.commit();
-
-    const savedOrder = await db.Order.findByPk(order.id, {
-      include: getIncludeItems()
-    });
 
     return res.status(201).json({
       message: 'Reservation submitted successfully.',
       id: order.id,
       orderCode: order.orderCode,
-      order: savedOrder
+      order
     });
   } catch (error) {
     if (!transaction.finished) {
@@ -113,13 +131,54 @@ router.post('/public', async (req, res, next) => {
 });
 
 /**
- * PUBLIC CUSTOMER ORDER TRACKING
- * URL: GET /orders/track/:orderCode?contactNumber=09123456789
+ * PUBLIC: TRACK ACTIVE ORDER BY CUSTOMER NAME
+ * URL: GET /orders/track-by-name?customerName=Juan
+ */
+router.get('/track-by-name', async (req, res, next) => {
+  try {
+    const customerName = String(req.query.customerName || '').trim();
+
+    if (!customerName) {
+      return res.status(400).json({
+        message: 'Customer name is required.'
+      });
+    }
+
+    const order = await db.Order.findOne({
+      where: {
+        [Op.and]: [
+          where(fn('LOWER', col('customerName')), normalizeName(customerName)),
+          {
+            status: {
+              [Op.notIn]: inactiveStatuses
+            }
+          }
+        ]
+      },
+      include: includeItems,
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        message: 'No active order found under this customer name.'
+      });
+    }
+
+    res.json(order);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * PUBLIC: TRACK ORDER BY REFERENCE AND CUSTOMER NAME
+ * URL: GET /orders/track/:orderCode?customerName=Juan
  */
 router.get('/track/:orderCode', async (req, res, next) => {
   try {
     const orderCode = String(req.params.orderCode || '').trim();
-    const customerName = String(req.query.customerName || '').trim();
+    const customerName = String(req.query.customerName || req.query.name || '').trim();
 
     if (!orderCode || !customerName) {
       return res.status(400).json({
@@ -129,10 +188,12 @@ router.get('/track/:orderCode', async (req, res, next) => {
 
     const order = await db.Order.findOne({
       where: {
-        orderCode,
-        customerName
+        [Op.and]: [
+          { orderCode },
+          where(fn('LOWER', col('customerName')), normalizeName(customerName))
+        ]
       },
-      include: getIncludeItems()
+      include: includeItems
     });
 
     if (!order) {
@@ -141,7 +202,7 @@ router.get('/track/:orderCode', async (req, res, next) => {
       });
     }
 
-    return res.json(order);
+    res.json(order);
   } catch (error) {
     next(error);
   }
@@ -151,65 +212,14 @@ router.get('/track/:orderCode', async (req, res, next) => {
  * ADMIN: GET ALL ORDERS
  * URL: GET /orders
  */
-router.get('/', authorize, async (req, res, next) => {
+router.get('/', async (req, res, next) => {
   try {
     const orders = await db.Order.findAll({
-      include: getIncludeItems(),
+      include: includeItems,
       order: [['createdAt', 'DESC']]
     });
 
-    return res.json(orders);
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * ADMIN: UPDATE ORDER ITEM PREPARATION CHECKBOX
- * URL: PUT /orders/:orderId/items/:itemId/prepared
- */
-router.put('/:orderId/items/:itemId/prepared', authorize, async (req, res, next) => {
-  try {
-    const order = await db.Order.findByPk(req.params.orderId, {
-      include: getIncludeItems()
-    });
-
-    if (!order) {
-      return res.status(404).json({
-        message: 'Order not found.'
-      });
-    }
-
-    if (order.status !== 'Preparing') {
-      return res.status(400).json({
-        message: 'Items can only be checked while the order is in Preparing status.'
-      });
-    }
-
-    const item = await db.OrderItem.findOne({
-      where: {
-        id: req.params.itemId,
-        orderId: req.params.orderId
-      }
-    });
-
-    if (!item) {
-      return res.status(404).json({
-        message: 'Order item not found.'
-      });
-    }
-
-    item.isPrepared = !!req.body.isPrepared;
-    await item.save();
-
-    const updatedOrder = await db.Order.findByPk(req.params.orderId, {
-      include: getIncludeItems()
-    });
-
-    return res.json({
-      message: 'Order item preparation status updated.',
-      order: updatedOrder
-    });
+    res.json(orders);
   } catch (error) {
     next(error);
   }
@@ -219,16 +229,8 @@ router.put('/:orderId/items/:itemId/prepared', authorize, async (req, res, next)
  * ADMIN: UPDATE ORDER STATUS
  * URL: PUT /orders/:id/status
  */
-router.put('/:id/status', authorize, async (req, res, next) => {
+router.put('/:id/status', async (req, res, next) => {
   try {
-    const allowedStatuses = [
-      'Pending',
-      'Preparing',
-      'Ready for Pickup',
-      'Completed',
-      'Cancelled'
-    ];
-
     const order = await db.Order.findByPk(req.params.id);
 
     if (!order) {
@@ -237,42 +239,12 @@ router.put('/:id/status', authorize, async (req, res, next) => {
       });
     }
 
-    const newStatus = req.body.status;
-
-    if (!newStatus || !allowedStatuses.includes(newStatus)) {
-      return res.status(400).json({
-        message: 'Invalid order status.'
-      });
-    }
-
-    if (newStatus === 'Ready for Pickup') {
-      const fullOrder = await db.Order.findByPk(order.id, {
-        include: getIncludeItems()
-      });
-
-      const orderItems = fullOrder?.items || [];
-
-      if (orderItems.length > 1) {
-        const allPrepared = orderItems.every((item: any) => item.isPrepared === true);
-
-        if (!allPrepared) {
-          return res.status(400).json({
-            message: 'Please check all ordered products before moving this order to Ready for Pickup.'
-          });
-        }
-      }
-    }
-
-    order.status = newStatus;
+    order.status = req.body.status || order.status;
     await order.save();
 
-    const updatedOrder = await db.Order.findByPk(order.id, {
-      include: getIncludeItems()
-    });
-
-    return res.json({
+    res.json({
       message: 'Order status updated successfully.',
-      order: updatedOrder
+      order
     });
   } catch (error) {
     next(error);

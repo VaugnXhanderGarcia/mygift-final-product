@@ -1,19 +1,17 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { OrderService } from '../_services/order.service';
 
 @Component({
-  selector: 'app-track-order',
   templateUrl: './track-order.component.html',
   styleUrls: ['./track-order.component.css']
 })
-export class TrackOrderComponent implements OnInit, OnDestroy {
+export class TrackOrderComponent implements OnInit {
   form!: FormGroup;
   order: any = null;
   loading = false;
   errorMessage = '';
-  autoRefreshTimer: any = null;
 
   statusSteps = [
     'Pending',
@@ -29,104 +27,48 @@ export class TrackOrderComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    const reference = this.route.snapshot.queryParamMap.get('reference') || '';
+
     this.form = this.fb.group({
-      orderCode: ['', Validators.required],
+      reference: [reference],
       customerName: ['', Validators.required]
     });
-
-    const reference = this.route.snapshot.queryParamMap.get('reference');
-    const name = this.route.snapshot.queryParamMap.get('name');
-
-    if (reference) {
-      this.form.patchValue({
-        orderCode: reference
-      });
-    }
-
-    if (name) {
-      this.form.patchValue({
-        customerName: name
-      });
-    }
   }
 
-  ngOnDestroy(): void {
-    this.stopAutoRefresh();
-  }
+  submit(): void {
+    this.errorMessage = '';
+    this.order = null;
 
-  trackOrder(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.errorMessage = 'Please enter your customer name.';
       return;
     }
 
+    const reference = String(this.form.value.reference || '').trim();
+    const customerName = String(this.form.value.customerName || '').trim();
+
     this.loading = true;
-    this.errorMessage = '';
 
-    const orderCode = this.form.value.orderCode;
-    const customerName = this.form.value.customerName;
+    const request = reference
+      ? this.orderService.trackByReference(reference, customerName)
+      : this.orderService.trackByName(customerName);
 
-    this.orderService.trackOrder(orderCode, customerName).subscribe({
+    request.subscribe({
       next: order => {
         this.loading = false;
         this.order = order;
-        this.startAutoRefresh();
       },
       error: error => {
         this.loading = false;
-        this.order = null;
-        this.stopAutoRefresh();
-
         this.errorMessage =
           error?.error?.message ||
-          'Order not found. Please check your reference number and customer name.';
+          'Order not found. Please check your name or reference number.';
       }
     });
   }
 
-  refreshOrderSilently(): void {
-    if (this.form.invalid) {
-      return;
-    }
-
-    const orderCode = this.form.value.orderCode;
-    const customerName = this.form.value.customerName;
-
-    this.orderService.trackOrder(orderCode, customerName).subscribe({
-      next: order => {
-        this.order = order;
-      },
-      error: () => {
-        this.stopAutoRefresh();
-      }
-    });
-  }
-
-  startAutoRefresh(): void {
-    this.stopAutoRefresh();
-
-    this.autoRefreshTimer = setInterval(() => {
-      this.refreshOrderSilently();
-    }, 10000);
-  }
-
-  stopAutoRefresh(): void {
-    if (this.autoRefreshTimer) {
-      clearInterval(this.autoRefreshTimer);
-      this.autoRefreshTimer = null;
-    }
-  }
-
-  getStatusClass(status: string): string {
-    if (status === 'Pending') return 'bg-secondary';
-    if (status === 'Preparing') return 'bg-warning text-dark';
-    if (status === 'Ready for Pickup') return 'bg-info text-dark';
-    if (status === 'Completed') return 'bg-success';
-    if (status === 'Cancelled') return 'bg-danger';
-    return 'bg-secondary';
-  }
-
-  isStepActive(step: string): boolean {
+  isStepDone(step: string): boolean {
     if (!this.order || this.order.status === 'Cancelled') {
       return false;
     }
@@ -134,14 +76,38 @@ export class TrackOrderComponent implements OnInit, OnDestroy {
     const currentIndex = this.statusSteps.indexOf(this.order.status);
     const stepIndex = this.statusSteps.indexOf(step);
 
-    return stepIndex <= currentIndex;
+    return currentIndex >= stepIndex;
   }
 
-  getTotal(): number {
-    if (!this.order) {
-      return 0;
+  isCurrentStep(step: string): boolean {
+    return this.order?.status === step;
+  }
+
+  formatMoney(value: any): string {
+    return Number(value || 0).toFixed(2);
+  }
+
+  getStatusClass(status: string): string {
+    if (status === 'Pending') {
+      return 'bg-secondary';
     }
 
-    return Number(this.order.totalAmount || 0);
+    if (status === 'Preparing') {
+      return 'bg-warning text-dark';
+    }
+
+    if (status === 'Ready for Pickup') {
+      return 'bg-info text-dark';
+    }
+
+    if (status === 'Completed') {
+      return 'bg-success';
+    }
+
+    if (status === 'Cancelled') {
+      return 'bg-danger';
+    }
+
+    return 'bg-secondary';
   }
 }

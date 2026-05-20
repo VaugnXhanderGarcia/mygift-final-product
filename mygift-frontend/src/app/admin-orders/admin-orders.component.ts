@@ -9,6 +9,8 @@ export class AdminOrdersComponent implements OnInit {
   orders: any[] = [];
   loading = false;
 
+  preparedItems: { [key: string]: boolean } = {};
+
   statuses = [
     'Pending',
     'Preparing',
@@ -62,6 +64,7 @@ export class AdminOrdersComponent implements OnInit {
     this.orderService.getAll().subscribe({
       next: orders => {
         this.orders = orders || [];
+        this.loadPreparedItems();
         this.loading = false;
       },
       error: error => {
@@ -69,6 +72,21 @@ export class AdminOrdersComponent implements OnInit {
         this.alertService.error(this.getErrorMessage(error));
       }
     });
+  }
+
+  loadPreparedItems(): void {
+    this.preparedItems = {};
+
+    for (const order of this.orders) {
+      if (!Array.isArray(order.items)) {
+        continue;
+      }
+
+      order.items.forEach((item: any, index: number) => {
+        const key = this.getPreparedStorageKey(order, item, index);
+        this.preparedItems[key] = localStorage.getItem(key) === 'true';
+      });
+    }
   }
 
   selectStatus(status: string): void {
@@ -89,7 +107,9 @@ export class AdminOrdersComponent implements OnInit {
 
   updateStatus(order: any, status: string): void {
     if (status === 'Ready for Pickup' && !this.canMoveToReady(order)) {
-      this.alertService.error('Please check all products first before moving this order to Ready for Pickup.');
+      this.alertService.error(
+        'Please check all ordered products before moving this order to Ready for Pickup.'
+      );
       return;
     }
 
@@ -99,6 +119,7 @@ export class AdminOrdersComponent implements OnInit {
 
     if (status === 'Cancelled') {
       const confirmCancel = confirm(`Cancel order ${order.orderCode}?`);
+
       if (!confirmCancel) {
         return;
       }
@@ -107,8 +128,11 @@ export class AdminOrdersComponent implements OnInit {
     this.orderService.updateStatus(order.id, status).subscribe({
       next: () => {
         order.status = status;
-
         this.selectedStatus = status;
+
+        if (status === 'Ready for Pickup') {
+          this.clearPreparedItems(order);
+        }
 
         this.alertService.success(`Order moved to ${status}.`);
       },
@@ -176,18 +200,20 @@ export class AdminOrdersComponent implements OnInit {
       return false;
     }
 
-    return order.items.every((item: any, index: number) =>
-      this.isItemPrepared(order, item, index)
-    );
+    return order.items.every((item: any, index: number) => {
+      return this.isItemPrepared(order, item, index);
+    });
   }
 
   isItemPrepared(order: any, item: any, index: number): boolean {
     const key = this.getPreparedStorageKey(order, item, index);
-    return localStorage.getItem(key) === 'true';
+    return this.preparedItems[key] === true;
   }
 
   setItemPrepared(order: any, item: any, index: number, checked: boolean): void {
     const key = this.getPreparedStorageKey(order, item, index);
+
+    this.preparedItems[key] = checked;
 
     if (checked) {
       localStorage.setItem(key, 'true');
@@ -196,9 +222,27 @@ export class AdminOrdersComponent implements OnInit {
     }
   }
 
+  clearPreparedItems(order: any): void {
+    if (!Array.isArray(order.items)) {
+      return;
+    }
+
+    order.items.forEach((item: any, index: number) => {
+      const key = this.getPreparedStorageKey(order, item, index);
+      delete this.preparedItems[key];
+      localStorage.removeItem(key);
+    });
+  }
+
   getPreparedStorageKey(order: any, item: any, index: number): string {
-    const itemId = item.id || item.productId || index;
-    return `mygift-order-${order.id}-item-${itemId}-prepared`;
+    const orderId = order.id || order.orderCode;
+    const itemId =
+      item.id ||
+      item.productId ||
+      item.productName ||
+      `item-${index}`;
+
+    return `mygift-order-${orderId}-${itemId}-${index}-prepared`;
   }
 
   getStatusBadgeClass(status: string): string {

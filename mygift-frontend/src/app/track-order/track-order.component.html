@@ -1,122 +1,120 @@
-<div class="track-wrapper">
-  <div class="card track-card shadow-sm">
-    <div class="card-body">
-      <h2 class="text-center mb-2">Track My Order</h2>
+<div class="container py-5">
+  <div class="card shadow-sm mx-auto mb-4" style="max-width: 720px;">
+    <div class="card-body p-4">
+      <h2 class="text-center mb-2">Track Your Order</h2>
 
-      <p class="text-muted text-center mb-4">
-        Enter your reference number and customer name to check your order status.
+      <p class="text-center text-muted mb-4">
+        Enter your customer name to check your active order.
+        Reference number is optional but recommended.
       </p>
 
-      <form [formGroup]="form" (ngSubmit)="trackOrder()">
-        <label class="form-label">Reference Number</label>
-        <input
-          type="text"
-          class="form-control mb-2"
-          formControlName="orderCode"
-          placeholder="Example: MG-123456789"
-        >
-
-        <label class="form-label">Customer Name</label>
-        <input
-          type="text"
-          class="form-control mb-3"
-          formControlName="customerName"
-          placeholder="Enter the customer name used in the order"
-        >
-
-        <button
-          type="submit"
-          class="btn btn-success w-100"
-          [disabled]="loading">
-          <span
-            *ngIf="loading"
-            class="spinner-border spinner-border-sm me-1">
-          </span>
-          {{ loading ? 'Checking...' : 'Track Order' }}
-        </button>
-      </form>
-
-      <div *ngIf="errorMessage" class="alert alert-danger mt-3">
+      <div *ngIf="errorMessage" class="alert alert-danger">
         {{ errorMessage }}
       </div>
+
+      <form [formGroup]="form" (ngSubmit)="submit()">
+        <div class="mb-3">
+          <label class="form-label">Reference Number</label>
+          <input
+            type="text"
+            formControlName="reference"
+            class="form-control"
+            placeholder="Example: MG-1779258826211"
+          />
+          <small class="text-muted">
+            Leave this blank if you forgot your reference number.
+          </small>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Customer Name</label>
+          <input
+            type="text"
+            formControlName="customerName"
+            class="form-control"
+            placeholder="Enter the same name used in your order"
+            [ngClass]="{ 'is-invalid': form.get('customerName')?.invalid && form.get('customerName')?.touched }"
+          />
+
+          <div class="invalid-feedback">
+            Customer name is required.
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100" [disabled]="loading">
+          <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+          Track Order
+        </button>
+      </form>
     </div>
   </div>
 
-  <div *ngIf="order" class="card track-result shadow mt-4">
+  <div *ngIf="order" class="card shadow-sm mx-auto" style="max-width: 720px;">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <div>
+        <h4 class="mb-1">Reference #: {{ order.orderCode }}</h4>
+        <div class="text-muted">{{ order.customerName }}</div>
+      </div>
+
+      <span class="badge fs-6" [ngClass]="getStatusClass(order.status)">
+        {{ order.status }}
+      </span>
+    </div>
+
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-        <div>
-          <h4 class="mb-1">
-            Reference #: {{ order.orderCode }}
-          </h4>
-
-          <p class="text-muted mb-0">
-            {{ order.customerName }}
-          </p>
-        </div>
-
-        <span class="badge fs-6" [ngClass]="getStatusClass(order.status)">
-          {{ order.status }}
-        </span>
-      </div>
-
-      <div
-        class="status-timeline mb-4"
-        *ngIf="order.status !== 'Cancelled'">
-
-        <div
-          class="status-step"
-          *ngFor="let step of statusSteps"
-          [class.active]="isStepActive(step)">
-          <div class="circle"></div>
-          <span>{{ step }}</span>
-        </div>
-      </div>
-
       <div *ngIf="order.status === 'Cancelled'" class="alert alert-danger">
         This order has been cancelled.
       </div>
 
-      <div class="order-info mb-3">
-        <p>
-          <strong>Customer Name:</strong>
-          {{ order.customerName }}
+      <div class="d-flex justify-content-between text-center mb-4" *ngIf="order.status !== 'Cancelled'">
+        <div class="flex-fill" *ngFor="let step of statusSteps">
+          <div
+            class="rounded-circle mx-auto mb-2"
+            style="width: 22px; height: 22px;"
+            [ngClass]="{
+              'bg-success': isStepDone(step),
+              'bg-warning': isCurrentStep(step) && step === 'Preparing',
+              'bg-info': isCurrentStep(step) && step === 'Ready for Pickup',
+              'bg-secondary': !isStepDone(step) && !isCurrentStep(step)
+            }">
+          </div>
+
+          <small
+            [ngClass]="{
+              'fw-bold text-success': isStepDone(step),
+              'fw-bold': isCurrentStep(step)
+            }">
+            {{ step }}
+          </small>
+        </div>
+      </div>
+
+      <div class="border rounded p-3 mb-3 bg-light">
+        <p class="mb-1">
+          <strong>Contact:</strong> {{ order.contactNumber }}
         </p>
 
-        <p>
-          <strong>Contact:</strong>
-          {{ order.contactNumber }}
+        <p class="mb-1">
+          <strong>Pickup Date:</strong> {{ order.pickupDate }}
         </p>
 
-        <p>
-          <strong>Pickup Date:</strong>
-          {{ order.pickupDate }}
+        <p class="mb-1">
+          <strong>Pickup Time:</strong> {{ order.pickupTime }}
         </p>
 
-        <p>
-          <strong>Pickup Time:</strong>
-          {{ order.pickupTime }}
-        </p>
-
-        <p>
-          <strong>Payment:</strong>
-          {{ order.paymentMethod || 'Pay at Counter' }}
-        </p>
-
-        <p *ngIf="order.notes">
-          <strong>Notes:</strong>
-          {{ order.notes }}
+        <p class="mb-0">
+          <strong>Payment:</strong> {{ order.paymentMethod || 'Pay at Counter' }}
         </p>
       </div>
 
       <div class="table-responsive">
-        <table class="table table-sm table-bordered align-middle">
+        <table class="table table-bordered align-middle">
           <thead class="table-light">
             <tr>
               <th>Product</th>
-              <th width="80">Qty</th>
-              <th width="120">Price</th>
-              <th width="120">Subtotal</th>
+              <th style="width: 80px;">Qty</th>
+              <th style="width: 120px;">Price</th>
+              <th style="width: 120px;">Subtotal</th>
             </tr>
           </thead>
 
@@ -124,21 +122,16 @@
             <tr *ngFor="let item of order.items">
               <td>{{ item.productName }}</td>
               <td>{{ item.quantity }}</td>
-              <td>₱{{ item.unitPrice }}</td>
-              <td>₱{{ item.subtotal }}</td>
+              <td>₱{{ formatMoney(item.unitPrice) }}</td>
+              <td>₱{{ formatMoney(item.subtotal) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="track-total">
-        <span>Total</span>
-        <strong>₱{{ getTotal() }}</strong>
+      <div class="alert alert-success text-end mb-0">
+        <strong>Total: ₱{{ formatMoney(order.totalAmount) }}</strong>
       </div>
-
-      <p class="text-muted small text-center mt-3 mb-0">
-        Status refreshes automatically every 10 seconds while this page is open.
-      </p>
     </div>
   </div>
 </div>
