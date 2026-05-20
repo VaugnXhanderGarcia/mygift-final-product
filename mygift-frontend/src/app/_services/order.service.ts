@@ -26,6 +26,13 @@ export class OrderService {
     });
   }
 
+  updateItemPrepared(orderId: number, itemId: number, isPrepared: boolean) {
+    return this.http.patch<any>(
+      `${API_URL}/orders/${orderId}/items/${itemId}/prepared`,
+      { isPrepared }
+    );
+  }
+
   trackByReference(orderCode: string, customerName: string) {
     return this.http.get<any>(
       `${API_URL}/orders/track/${encodeURIComponent(orderCode)}?customerName=${encodeURIComponent(customerName)}`
