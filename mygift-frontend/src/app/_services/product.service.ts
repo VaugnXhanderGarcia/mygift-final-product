@@ -1,8 +1,14 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_URL } from '../_helpers/api-url';
 
-@Injectable({ providedIn: 'root' })
+const API_URL =
+  window.location.hostname === 'localhost'
+    ? 'http://localhost:4000'
+    : 'https://mygift-frontend.onrender.com';
+
+@Injectable({
+  providedIn: 'root'
+})
 export class ProductService {
   constructor(private http: HttpClient) {}
 
@@ -20,6 +26,12 @@ export class ProductService {
 
   update(id: number, product: any) {
     return this.http.put<any>(`${API_URL}/products/${id}`, product);
+  }
+
+  updateAvailability(id: number, isAvailable: boolean) {
+    return this.http.patch<any>(`${API_URL}/products/${id}/availability`, {
+      isAvailable
+    });
   }
 
   delete(id: number) {

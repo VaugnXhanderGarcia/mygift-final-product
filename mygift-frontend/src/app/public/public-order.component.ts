@@ -56,10 +56,7 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
   }
 
   generateQrCode(): void {
-    const customerOrderUrl =
-      window.location.hostname === 'localhost'
-        ? 'http://localhost:4200/'
-        : 'https://mygift-frontend.onrender.com/';
+    const customerOrderUrl = window.location.origin + '/';
 
     this.qrUrl =
       'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' +
@@ -69,9 +66,9 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
   loadProducts(): void {
     this.productService.getAll().subscribe({
       next: (products: any[]) => {
-        this.products = products.filter(p => p.isAvailable);
+        this.products = products || [];
 
-        const categorySet = new Set(this.products.map(p => p.category));
+        const categorySet = new Set(this.products.map(product => product.category));
         this.categories = ['All', ...Array.from(categorySet)];
       },
       error: () => {
@@ -86,6 +83,10 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     }
 
     return category;
+  }
+
+  isProductAvailable(product: any): boolean {
+    return product?.isAvailable === true;
   }
 
   isFreshFruitCategory(category: string): boolean {
@@ -105,10 +106,14 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
   }
 
   getProductDescription(product: any): string {
+    if (product.description) {
+      return product.description;
+    }
+
     const name = String(product.name || '').toLowerCase();
 
     if (name.includes('mango')) {
-      return 'A sweet and refreshing mango drink made with fresh fruit flavor, perfect for a cool and fruity treat.';
+      return 'A sweet and refreshing mango drink made with fresh fruit flavor.';
     }
 
     if (name.includes('strawberry')) {
@@ -128,7 +133,7 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     }
 
     if (name.includes('fries')) {
-      return 'A crispy snack option that is good for sharing or pairing with drinks.';
+      return 'A crispy snack option good for sharing or pairing with drinks.';
     }
 
     if (this.isFreshFruitCategory(product.category)) {
@@ -177,6 +182,11 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (!this.isProductAvailable(this.selectedProduct)) {
+      alert('This product is currently not available.');
+      return;
+    }
+
     let finalName = this.selectedProduct.name;
     let finalPrice = Number(this.selectedProduct.price);
 
@@ -208,6 +218,11 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
   }
 
   add(product: any): void {
+    if (!this.isProductAvailable(product)) {
+      alert('This product is currently not available.');
+      return;
+    }
+
     this.openProduct(product);
   }
 
@@ -265,7 +280,7 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     }
 
     if (this.cart.length === 0) {
-      alert('Please select at least one product.');
+      alert('Please select at least one available product.');
       return;
     }
 
@@ -294,14 +309,14 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
 
         const savedOrder = response.order || response;
 
-this.receiptOrder = {
-  ...payload,
-  ...savedOrder,
-  id: savedOrder.id,
-  orderCode: savedOrder.orderCode,
-  items: payload.items,
-  createdAt: new Date()
-};
+        this.receiptOrder = {
+          ...payload,
+          ...savedOrder,
+          id: savedOrder.id,
+          orderCode: savedOrder.orderCode,
+          items: payload.items,
+          createdAt: new Date()
+        };
 
         this.screen = 'receipt';
         this.startReceiptCountdown();

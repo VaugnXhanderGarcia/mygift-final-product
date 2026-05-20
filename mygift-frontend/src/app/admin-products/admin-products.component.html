@@ -1,68 +1,185 @@
-<div class="card p-3 mb-4">
-  <h4>{{editing ? 'Edit Product' : 'Add Product'}}</h4>
-
-  <form [formGroup]="form" (ngSubmit)="save()" class="row g-2">
-    <div class="col-md-2">
-      <input class="form-control" formControlName="name" placeholder="Name">
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="mb-1">Products</h1>
+      <p class="text-muted mb-0">
+        Manage product details and availability.
+      </p>
     </div>
 
-    <div class="col-md-2">
-      <input class="form-control" formControlName="category" placeholder="Category">
+    <button type="button" class="btn btn-outline-primary btn-sm" (click)="load()" [disabled]="loading">
+      <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+      Refresh
+    </button>
+  </div>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h4 class="mb-3">
+        {{ editing ? 'Edit Product' : 'Add Product' }}
+      </h4>
+
+      <form [formGroup]="form" (ngSubmit)="save()" class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Product Name</label>
+          <input
+            type="text"
+            class="form-control"
+            formControlName="name"
+            placeholder="Product name">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Category</label>
+          <input
+            type="text"
+            class="form-control"
+            formControlName="category"
+            placeholder="Category">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Price</label>
+          <input
+            type="number"
+            class="form-control"
+            formControlName="price"
+            placeholder="Price">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Image URL</label>
+          <input
+            type="text"
+            class="form-control"
+            formControlName="imageUrl"
+            placeholder="Image URL">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Available?</label>
+          <select class="form-select" formControlName="isAvailable">
+            <option [ngValue]="true">Yes</option>
+            <option [ngValue]="false">No</option>
+          </select>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea
+            class="form-control"
+            rows="2"
+            formControlName="description"
+            placeholder="Short product description">
+          </textarea>
+        </div>
+
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100" [disabled]="saving">
+            <span *ngIf="saving" class="spinner-border spinner-border-sm me-1"></span>
+            {{ editing ? 'Update' : 'Save' }}
+          </button>
+        </div>
+
+        <div class="col-md-2" *ngIf="editing">
+          <button type="button" class="btn btn-secondary w-100" (click)="cancel()">
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
+  </div>
 
-    <div class="col-md-2">
-      <input class="form-control" formControlName="price" type="number" placeholder="Price">
-    </div>
+  <div *ngIf="loading" class="alert alert-info">
+    Loading products...
+  </div>
 
-    <div class="col-md-3">
-      <input class="form-control" formControlName="imageUrl" placeholder="Image URL">
-    </div>
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover align-middle">
+      <thead class="table-light">
+        <tr>
+          <th width="80">Image</th>
+          <th>Name</th>
+          <th>Category</th>
+          <th width="120">Price</th>
+          <th width="140">Available</th>
+          <th width="260">Actions</th>
+        </tr>
+      </thead>
 
-    <div class="col-md-2">
-      <input class="form-control" formControlName="description" placeholder="Description">
-    </div>
+      <tbody>
+        <tr *ngFor="let product of products">
+          <td>
+            <img
+              *ngIf="product.imageUrl"
+              [src]="product.imageUrl"
+              alt="{{ product.name }}"
+              style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">
 
-    <div class="col-md-1">
-      <button class="btn btn-primary w-100" [disabled]="loading">
-        {{editing ? 'Update' : 'Add'}}
-      </button>
-    </div>
+            <div
+              *ngIf="!product.imageUrl"
+              class="bg-light border rounded d-flex align-items-center justify-content-center"
+              style="width: 60px; height: 60px;">
+              N/A
+            </div>
+          </td>
 
-    <div class="col-md-1" *ngIf="editing">
-      <button type="button" class="btn btn-secondary w-100" (click)="cancel()">Cancel</button>
-    </div>
-  </form>
-</div>
+          <td>
+            <strong>{{ product.name }}</strong>
+            <div class="small text-muted" *ngIf="product.description">
+              {{ product.description }}
+            </div>
+          </td>
 
-<div class="card p-3">
-  <h4>Products</h4>
+          <td>{{ product.category }}</td>
 
-  <table class="table table-bordered table-striped mt-3">
-    <thead>
-      <tr>
-        <th>Image</th>
-        <th>Name</th>
-        <th>Category</th>
-        <th>Price</th>
-        <th>Available</th>
-        <th width="180">Action</th>
-      </tr>
-    </thead>
+          <td>₱{{ product.price }}</td>
 
-    <tbody>
-      <tr *ngFor="let product of products">
-        <td>
-          <img [src]="product.imageUrl" width="80" height="55" style="object-fit: cover;">
-        </td>
-        <td>{{product.name}}</td>
-        <td>{{product.category}}</td>
-        <td>₱{{product.price}}</td>
-        <td>{{product.isAvailable ? 'Yes' : 'No'}}</td>
-        <td>
-          <button class="btn btn-sm btn-warning me-2" (click)="edit(product)">Edit</button>
-          <button class="btn btn-sm btn-danger" (click)="deleteProduct(product.id)">Delete</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+          <td>
+            <span class="badge" [ngClass]="getAvailabilityBadge(product)">
+              {{ getAvailabilityText(product) }}
+            </span>
+          </td>
+
+          <td>
+            <button
+              type="button"
+              class="btn btn-sm btn-primary me-1"
+              (click)="edit(product)">
+              Edit
+            </button>
+
+            <button
+              *ngIf="!product.isAvailable"
+              type="button"
+              class="btn btn-sm btn-success me-1"
+              (click)="setAvailability(product, true)">
+              Set Yes
+            </button>
+
+            <button
+              *ngIf="product.isAvailable"
+              type="button"
+              class="btn btn-sm btn-warning me-1"
+              (click)="setAvailability(product, false)">
+              Set No
+            </button>
+
+            <button
+              type="button"
+              class="btn btn-sm btn-danger"
+              (click)="delete(product)">
+              Delete
+            </button>
+          </td>
+        </tr>
+
+        <tr *ngIf="!loading && products.length === 0">
+          <td colspan="6" class="text-center text-muted">
+            No products found.
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
