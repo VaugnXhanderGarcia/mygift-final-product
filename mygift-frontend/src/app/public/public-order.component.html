@@ -1,361 +1,224 @@
-<ng-container *ngIf="screen === 'order'">
-  <section class="mygift-hero-banner mb-4">
-    <div class="hero-overlay">
-      <div class="hero-content">
-        <h1>MyGift Lemonade and Snack Bar</h1>
-        <p>Scan, choose your lemonade or snacks, reserve pickup time, and pay at the counter.</p>
-      </div>
-      <div class="text-center mb-4">
-  <a routerLink="/track-order" class="btn btn-outline-success">
-    Track Your Order
-  </a>
-</div>
+<section class="mygift-hero-banner mb-4">
+  <div class="hero-overlay">
+    <div class="hero-content">
+      <h1>MyGift Lemonade and Snack Bar</h1>
 
-      <div class="hero-qr-box">
-        <img [src]="qrUrl" alt="Customer Ordering QR">
-        <div>Customer Ordering QR</div>
+      <p>
+        Scan, choose your lemonade or snacks, reserve pickup time, and pay at the
+        counter.
+      </p>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <a href="#order-section" class="btn btn-light btn-lg px-4">
+          Start Ordering
+        </a>
+
+        <a routerLink="/track-order" class="btn btn-outline-light btn-lg px-4">
+          Track Your Order
+        </a>
       </div>
     </div>
-  </section>
 
-  <div class="row g-4">
-    <div class="col-lg-8">
-      <div class="d-flex flex-wrap gap-2 mb-3">
+    <div class="hero-qr-box">
+      <img [src]="qrUrl" alt="Customer Ordering QR" />
+      <div>Customer Ordering QR</div>
+    </div>
+  </div>
+</section>
+
+<div id="order-section" class="row g-4">
+  <div class="col-lg-8">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <div class="d-flex flex-wrap gap-2">
         <button
           *ngFor="let category of categories"
           type="button"
           class="btn"
-          [ngClass]="category === selectedCategory ? 'btn-primary' : 'btn-outline-primary'"
+          [ngClass]="category === selectedCategory ? 'btn-success' : 'btn-outline-success'"
           (click)="selectedCategory = category">
           {{ displayCategory(category) }}
         </button>
       </div>
 
-      <div class="row g-3">
-        <div class="col-md-6 col-xl-4" *ngFor="let product of filteredProducts">
-          <div class="card h-100 product-card shadow-sm position-relative">
+      <a routerLink="/track-order" class="btn btn-outline-success">
+        Track Your Order
+      </a>
+    </div>
 
-            <span
-              *ngIf="!isProductAvailable(product)"
-              class="badge bg-danger position-absolute top-0 end-0 m-2"
-              style="z-index: 2;">
-              Not Available
-            </span>
-
+    <div class="row g-3">
+      <div class="col-md-6 col-xl-4" *ngFor="let product of filteredProducts">
+        <div class="card h-100 product-card shadow-sm">
+          <div class="position-relative">
             <img
               [src]="product.imageUrl"
               class="card-img-top product-clickable"
-              [class.opacity-50]="!isProductAvailable(product)"
               style="cursor: pointer;"
-              (click)="openProduct(product)"
               alt="{{ product.name }}"
-            >
+              (click)="openProduct(product)"
+            />
 
-            <div class="card-body">
-              <span class="badge bg-light text-dark mb-2">
-                {{ displayCategory(product.category) }}
-              </span>
-
-              <h5>{{ product.name }}</h5>
-
-              <p class="text-muted small">
-                {{ product.description || getProductDescription(product) }}
-              </p>
-
-              <div class="d-flex justify-content-between align-items-center">
-                <strong>₱{{ product.price }}</strong>
-
-                <button
-                  type="button"
-                  class="btn btn-sm"
-                  [ngClass]="isProductAvailable(product) ? 'btn-primary' : 'btn-secondary'"
-                  [disabled]="!isProductAvailable(product)"
-                  (click)="add(product)">
-                  {{ isProductAvailable(product) ? 'Add' : 'Unavailable' }}
-                </button>
-              </div>
-            </div>
+            <span
+              *ngIf="!product.isAvailable"
+              class="badge bg-danger position-absolute top-0 end-0 m-2">
+              Not Available
+            </span>
           </div>
-        </div>
 
-        <div *ngIf="filteredProducts.length === 0" class="col-12">
-          <div class="alert alert-light border">
-            No products found in this category.
+          <div class="card-body">
+            <span class="badge bg-light text-dark mb-2">
+              {{ displayCategory(product.category) }}
+            </span>
+
+            <h5>{{ product.name }}</h5>
+
+            <p class="text-muted small">
+              {{ product.description }}
+            </p>
+
+            <div class="d-flex justify-content-between align-items-center">
+              <strong>₱{{ product.price }}</strong>
+
+              <button
+                class="btn btn-sm btn-success"
+                type="button"
+                [disabled]="!product.isAvailable"
+                (click)="add(product)">
+                {{ product.isAvailable ? 'Add' : 'Unavailable' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="col-lg-4">
-      <div class="card shadow sticky-top order-panel">
-        <div class="card-body">
-          <h4>Reservation Details</h4>
+    <div *ngIf="filteredProducts.length === 0" class="alert alert-light border mt-3">
+      No products available under this category.
+    </div>
+  </div>
 
-          <form [formGroup]="form" (ngSubmit)="submit()">
+  <div class="col-lg-4">
+    <div class="card shadow sticky-top order-panel">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <div>
+            <h4 class="mb-0">Reservation Details</h4>
+            <small class="text-muted">Review your order before submitting.</small>
+          </div>
+        </div>
+
+        <form [formGroup]="form" (ngSubmit)="submit()">
+          <div class="mb-2">
+            <label class="form-label">Customer Name</label>
             <input
-              class="form-control mb-2"
+              class="form-control"
               formControlName="customerName"
-              placeholder="Customer name"
-            >
+              placeholder="Enter your name"
+            />
+          </div>
 
+          <div class="mb-2">
+            <label class="form-label">Contact Number</label>
             <input
-              class="form-control mb-2"
+              class="form-control"
               formControlName="contactNumber"
-              placeholder="Contact number"
-            >
+              placeholder="Enter your contact number"
+            />
+          </div>
 
-            <label class="form-label small">Pickup date</label>
+          <div class="mb-2">
+            <label class="form-label">Pickup Date</label>
             <input
-              class="form-control mb-2"
+              class="form-control"
               type="date"
               formControlName="pickupDate"
-            >
+            />
+          </div>
 
-            <label class="form-label small">Pickup time</label>
+          <div class="mb-2">
+            <label class="form-label">Pickup Time</label>
             <input
-              class="form-control mb-2"
+              class="form-control"
               type="time"
               formControlName="pickupTime"
-            >
+            />
+          </div>
 
+          <div class="mb-3">
+            <label class="form-label">Notes</label>
             <textarea
-              class="form-control mb-3"
+              class="form-control"
               rows="2"
               formControlName="notes"
               placeholder="Notes or customization request">
             </textarea>
+          </div>
 
-            <div *ngIf="cart.length === 0" class="alert alert-light border">
-              No selected items yet.
-            </div>
+          <div *ngIf="cart.length === 0" class="alert alert-light border">
+            No selected items yet.
+          </div>
 
-            <div
-              *ngFor="let item of cart"
-              class="d-flex justify-content-between align-items-center border-bottom py-2">
-              <div>
-                <strong>{{ item.productName }}</strong>
-                <br>
-                <small>₱{{ item.price }} x {{ item.quantity }}</small>
-              </div>
+          <div
+            *ngFor="let item of cart"
+            class="d-flex justify-content-between align-items-center border-bottom py-2">
 
-              <div class="btn-group btn-group-sm">
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary"
-                  (click)="decrease(item)">
-                  -
-                </button>
-
-                <button
-                  type="button"
-                  class="btn btn-outline-secondary"
-                  (click)="increaseCartItem(item)">
-                  +
-                </button>
-
-                <button
-                  type="button"
-                  class="btn btn-outline-danger"
-                  (click)="removeCartItem(item)">
-                  x
-                </button>
-              </div>
-            </div>
-
-            <div class="d-flex justify-content-between mt-3 fs-5">
-              <strong>Total</strong>
-              <strong>₱{{ total() }}</strong>
-            </div>
-
-            <div class="alert alert-info small mt-3 mb-3">
-              Payment method: Pay at the counter upon claiming.
-            </div>
-
-            <button
-              type="submit"
-              class="btn btn-success w-100"
-              [disabled]="loading">
-              Review Order
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-</ng-container>
-
-<ng-container *ngIf="screen === 'review'">
-  <div class="review-wrapper">
-    <div class="card review-card shadow-sm">
-      <div class="card-body">
-        <h2 class="text-center mb-3">Confirm Your Order</h2>
-
-        <p class="text-muted text-center mb-4">
-          Please review your details before finishing your order.
-        </p>
-
-        <div class="customer-review mb-4">
-          <h5>Customer Details</h5>
-
-          <p><strong>Name:</strong> {{ form.value.customerName }}</p>
-          <p><strong>Contact Number:</strong> {{ form.value.contactNumber }}</p>
-          <p><strong>Pickup Date:</strong> {{ form.value.pickupDate }}</p>
-          <p><strong>Pickup Time:</strong> {{ form.value.pickupTime }}</p>
-          <p *ngIf="form.value.notes">
-            <strong>Notes:</strong> {{ form.value.notes }}
-          </p>
-        </div>
-
-        <div class="order-review mb-4">
-          <h5>Order Details</h5>
-
-          <div class="review-item" *ngFor="let item of cart">
             <div>
               <strong>{{ item.productName }}</strong>
-              <div class="text-muted">
-                ₱{{ item.price }} x {{ item.quantity }}
-              </div>
+              <br />
+              <small>₱{{ item.price }} x {{ item.quantity }}</small>
             </div>
 
-            <div class="review-actions">
+            <div class="btn-group btn-group-sm">
               <button
                 type="button"
-                class="btn btn-sm btn-outline-secondary"
+                class="btn btn-outline-secondary"
                 (click)="decrease(item)">
                 -
               </button>
 
-              <span class="mx-2">{{ item.quantity }}</span>
-
               <button
                 type="button"
-                class="btn btn-sm btn-outline-secondary"
-                (click)="increaseCartItem(item)">
+                class="btn btn-outline-secondary"
+                (click)="add({ id: item.productId, name: item.productName, price: item.price })">
                 +
               </button>
-
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-danger ms-2"
-                (click)="removeCartItem(item)">
-                Remove
-              </button>
-            </div>
-
-            <div class="fw-bold">
-              ₱{{ item.price * item.quantity }}
             </div>
           </div>
-        </div>
 
-        <div class="review-total">
-          <span>Total</span>
-          <strong>₱{{ total() }}</strong>
-        </div>
+          <div class="d-flex justify-content-between mt-3 fs-5">
+            <strong>Total</strong>
+            <strong>₱{{ total() }}</strong>
+          </div>
 
-        <div class="d-flex gap-2 mt-4">
-          <button
-            type="button"
-            class="btn btn-outline-success w-50"
-            (click)="backToOrder()">
-            Add / Edit Order
-          </button>
+          <div class="alert alert-info small mt-3 mb-3">
+            Payment method: Pay at the counter upon claiming.
+          </div>
 
           <button
-            type="button"
-            class="btn btn-success w-50"
-            [disabled]="loading"
-            (click)="finishOrder()">
-            <span
-              *ngIf="loading"
-              class="spinner-border spinner-border-sm me-1">
-            </span>
-            {{ loading ? 'Submitting...' : 'Finish Order' }}
+            class="btn btn-success w-100"
+            type="submit"
+            [disabled]="loading">
+            <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+            {{ loading ? 'Submitting...' : 'Reserve Order' }}
           </button>
+        </form>
+
+        <div *ngIf="submittedOrder" class="alert alert-success mt-3">
+          Reservation received.
+          <br />
+          Reference #: <strong>{{ submittedOrder.orderCode || submittedOrder.id }}</strong>
+          <br />
+
+          <a
+            class="alert-link"
+            [routerLink]="['/track-order']"
+            [queryParams]="{ reference: submittedOrder.orderCode }">
+            Track this order
+          </a>
         </div>
       </div>
     </div>
   </div>
-</ng-container>
-
-<ng-container *ngIf="screen === 'receipt' && receiptOrder">
-  <div class="receipt-wrapper">
-    <div class="receipt-card shadow">
-      <div class="receipt-header">
-        <h2>MyGift</h2>
-        <p>Order Receipt</p>
-      </div>
-
-      <div class="receipt-reference">
-        Reference No.
-        <strong>{{ receiptOrder.orderCode || receiptOrder.id }}</strong>
-      </div>
-
-      <div class="receipt-info">
-        <p><strong>Name:</strong> {{ receiptOrder.customerName }}</p>
-        <p><strong>Contact:</strong> {{ receiptOrder.contactNumber }}</p>
-        <p>
-          <strong>Pickup:</strong>
-          {{ receiptOrder.pickupDate }} at {{ receiptOrder.pickupTime }}
-        </p>
-        <p><strong>Date Ordered:</strong> {{ getReceiptDate() }}</p>
-      </div>
-
-      <hr>
-
-      <div class="receipt-item" *ngFor="let item of receiptOrder.items">
-        <div>
-          <strong>{{ item.productName }}</strong>
-          <small>₱{{ item.price }} x {{ item.quantity }}</small>
-        </div>
-
-        <span>₱{{ item.price * item.quantity }}</span>
-      </div>
-
-      <hr>
-
-      <div class="receipt-total">
-        <span>Total</span>
-        <strong>₱{{ total() }}</strong>
-      </div>
-
-      <div class="receipt-message mt-3">
-        Thank you for your order. Please screenshot or save this receipt.
-      </div>
-
-      <a
-        class="btn btn-success w-100 mt-3"
-        [routerLink]="['/track-order']"
-        [queryParams]="{
-          reference: receiptOrder.orderCode || receiptOrder.id,
-          name: receiptOrder.customerName
-        }">
-        Track My Order
-      </a>
-
-      <div class="countdown-box mt-4">
-        <p>
-          Starting a new order in <strong>{{ countdown }}</strong> seconds...
-        </p>
-
-        <div class="progress">
-          <div
-            class="progress-bar"
-            role="progressbar"
-            [style.width.%]="countdown * 10">
-          </div>
-        </div>
-
-        <button
-          type="button"
-          class="btn btn-outline-success w-100 mt-3"
-          (click)="skipReceiptTimer()">
-          Skip and Start New Order
-        </button>
-      </div>
-    </div>
-  </div>
-</ng-container>
+</div>
 
 <div class="modal-backdrop-custom" *ngIf="selectedProduct">
   <div class="product-modal card shadow-lg">
@@ -369,12 +232,6 @@
 
       <h4 class="mb-2">{{ selectedProduct.name }}</h4>
 
-      <span
-        *ngIf="!isProductAvailable(selectedProduct)"
-        class="badge bg-danger mb-3">
-        Not Available
-      </span>
-
       <p class="text-muted mb-3">
         {{ selectedDescription }}
       </p>
@@ -385,13 +242,15 @@
 
       <div
         class="form-check mb-3"
-        *ngIf="isFreshFruitCategory(selectedProduct.category) && isProductAvailable(selectedProduct)">
+        *ngIf="isFreshFruitCategory(selectedProduct.category)">
+
         <input
           id="yakultOption"
           type="checkbox"
           class="form-check-input"
           [(ngModel)]="addYakult"
-          name="addYakult">
+          name="addYakult"
+        />
 
         <label for="yakultOption" class="form-check-label">
           Add Yakult + ₱10
@@ -400,7 +259,8 @@
 
       <div
         class="mb-3"
-        *ngIf="isHotColdLemonadeCategory(selectedProduct.category) && isProductAvailable(selectedProduct)">
+        *ngIf="isHotColdLemonadeCategory(selectedProduct.category)">
+
         <label class="form-label fw-semibold">Choose option:</label>
 
         <div class="d-flex gap-3">
@@ -410,7 +270,8 @@
               class="form-check-input"
               name="temperature"
               value="Cold"
-              [(ngModel)]="selectedTemperature">
+              [(ngModel)]="selectedTemperature"
+            />
             Cold
           </label>
 
@@ -420,15 +281,14 @@
               class="form-check-input"
               name="temperature"
               value="Hot"
-              [(ngModel)]="selectedTemperature">
+              [(ngModel)]="selectedTemperature"
+            />
             Hot
           </label>
         </div>
       </div>
 
-      <div
-        class="d-flex align-items-center gap-3 mb-3"
-        *ngIf="isProductAvailable(selectedProduct)">
+      <div class="d-flex align-items-center gap-3 mb-3">
         <button
           type="button"
           class="btn btn-outline-secondary"
@@ -446,17 +306,11 @@
         </button>
       </div>
 
-      <div *ngIf="!isProductAvailable(selectedProduct)" class="alert alert-danger">
-        This product is currently not available.
-      </div>
-
       <button
         type="button"
-        class="btn w-100"
-        [ngClass]="isProductAvailable(selectedProduct) ? 'btn-success' : 'btn-secondary'"
-        [disabled]="!isProductAvailable(selectedProduct)"
+        class="btn btn-success w-100"
         (click)="confirmAddToCart()">
-        {{ isProductAvailable(selectedProduct) ? 'Add to Cart' : 'Unavailable' }}
+        Add to Cart
       </button>
     </div>
   </div>
