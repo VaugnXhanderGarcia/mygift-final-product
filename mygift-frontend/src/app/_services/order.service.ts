@@ -1,8 +1,11 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { API_URL } from '../_helpers/api-url';
 
-@Injectable({ providedIn: 'root' })
+const API_URL = 'https://mygift-backend.onrender.com';
+
+@Injectable({
+  providedIn: 'root'
+})
 export class OrderService {
   constructor(private http: HttpClient) {}
 
@@ -18,9 +21,16 @@ export class OrderService {
     return this.http.put<any>(`${API_URL}/orders/${id}/status`, { status });
   }
 
-  trackOrder(orderCode: string, contactNumber: string) {
-    return this.http.get<any>(
-      `${API_URL}/orders/track/${encodeURIComponent(orderCode)}?contactNumber=${encodeURIComponent(contactNumber)}`
+  updateItemPrepared(orderId: number, itemId: number, isPrepared: boolean) {
+    return this.http.put<any>(
+      `${API_URL}/orders/${orderId}/items/${itemId}/prepared`,
+      { isPrepared }
     );
   }
+
+  trackOrder(orderCode: string, customerName: string) {
+  return this.http.get<any>(
+    `${API_URL}/orders/track/${encodeURIComponent(orderCode)}?customerName=${encodeURIComponent(customerName)}`
+  );
+}
 }

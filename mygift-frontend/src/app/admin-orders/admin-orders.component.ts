@@ -7,7 +7,6 @@ import { AlertService } from '../_services/alert.service';
 })
 export class AdminOrdersComponent implements OnInit {
   orders: any[] = [];
-  loading = false;
 
   statuses = [
     'Pending',
@@ -15,34 +14,6 @@ export class AdminOrdersComponent implements OnInit {
     'Ready for Pickup',
     'Completed',
     'Cancelled'
-  ];
-
-  statusSections = [
-    {
-      title: 'New Orders',
-      status: 'Pending',
-      description: 'Orders waiting to be prepared.'
-    },
-    {
-      title: 'Preparing',
-      status: 'Preparing',
-      description: 'Orders currently being prepared.'
-    },
-    {
-      title: 'Ready for Pickup',
-      status: 'Ready for Pickup',
-      description: 'Orders ready for customer pickup.'
-    },
-    {
-      title: 'Completed Orders',
-      status: 'Completed',
-      description: 'Orders already claimed by customers.'
-    },
-    {
-      title: 'Cancelled Orders',
-      status: 'Cancelled',
-      description: 'Orders that were cancelled.'
-    }
   ];
 
   constructor(
@@ -55,16 +26,12 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   load(): void {
-    this.loading = true;
-
     this.orderService.getAll().subscribe({
       next: orders => {
-        this.orders = orders;
-        this.loading = false;
+        this.orders = orders || [];
       },
       error: error => {
-        this.loading = false;
-        this.alertService.error(error);
+        this.alertService.error(this.getErrorMessage(error));
       }
     });
   }
@@ -74,42 +41,104 @@ export class AdminOrdersComponent implements OnInit {
   }
 
   update(order: any, status: string): void {
-    if (order.status === status) {
+    if (status === order.status) {
+      return;
+    }
+
+    if (status === 'Ready for Pickup' && !this.allItemsPrepared(order)) {
+      this.alertService.error(
+        'Please check all products first before moving this order to Ready for Pickup.'
+      );
       return;
     }
 
     this.orderService.updateStatus(order.id, status).subscribe({
-      next: () => {
-        order.status = status;
-        this.alertService.success(`Order ${order.orderCode} moved to ${status}.`);
+      next: response => {
+        const updatedOrder = response.order;
+
+        this.orders = this.orders.map(existingOrder =>
+          existingOrder.id === updatedOrder.id ? updatedOrder : existingOrder
+        );
+
+        this.alertService.success('Order status updated successfully.');
       },
       error: error => {
-        this.alertService.error(error);
+        this.alertService.error(this.getErrorMessage(error));
       }
     });
   }
 
-  moveToPreparing(order: any): void {
-    this.update(order, 'Preparing');
+  toggleItemPrepared(order: any, item: any): void {
+    this.orderService.updateItemPrepared(order.id, item.id, item.isPrepared).subscribe({
+      next: response => {
+        const updatedOrder = response.order;
+
+        this.orders = this.orders.map(existingOrder =>
+          existingOrder.id === updatedOrder.id ? updatedOrder : existingOrder
+        );
+      },
+      error: error => {
+        item.isPrepared = !item.isPrepared;
+
+        this.alertService.error(
+          this.getErrorMessage(error) ||
+          'Failed to update item preparation status.'
+        );
+      }
+    });
   }
 
-  moveToReady(order: any): void {
-    this.update(order, 'Ready for Pickup');
+  allItemsPrepared(order: any): boolean {
+    if (!order.items || order.items.length <= 1) {
+      return true;
+    }
+
+    return order.items.every((item: any) => item.isPrepared === true);
   }
 
-  moveToCompleted(order: any): void {
-    this.update(order, 'Completed');
+  preparedCount(order: any): number {
+    if (!order.items) {
+      return 0;
+    }
+
+    return order.items.filter((item: any) => item.isPrepared === true).length;
   }
 
-  moveToCancelled(order: any): void {
-    this.update(order, 'Cancelled');
+  isStatusOptionDisabled(order: any, status: string): boolean {
+    return status === 'Ready for Pickup' && !this.allItemsPrepared(order);
   }
 
-  getTotalByStatus(status: string): number {
-    return this.getOrdersByStatus(status).length;
+  getBadgeClass(status: string): string {
+    switch (status) {
+      case 'Pending':
+        return 'bg-secondary';
+
+      case 'Preparing':
+        return 'bg-warning text-dark';
+
+      case 'Ready for Pickup':
+        return 'bg-primary';
+
+      case 'Completed':
+        return 'bg-success';
+
+      case 'Cancelled':
+        return 'bg-danger';
+
+      default:
+        return 'bg-secondary';
+    }
   }
 
-  getGrandTotal(order: any): number {
-    return Number(order.totalAmount || 0);
+  private getErrorMessage(error: any): string {
+    if (typeof error === 'string') {
+      return error;
+    }
+
+    return (
+      error?.error?.message ||
+      error?.message ||
+      'Something went wrong. Please try again.'
+    );
   }
 }

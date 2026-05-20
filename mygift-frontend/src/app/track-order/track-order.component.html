@@ -4,7 +4,7 @@
       <h2 class="text-center mb-2">Track My Order</h2>
 
       <p class="text-muted text-center mb-4">
-        Enter your reference number and contact number to check your order status.
+        Enter your reference number and customer name to check your order status.
       </p>
 
       <form [formGroup]="form" (ngSubmit)="trackOrder()">
@@ -13,19 +13,25 @@
           type="text"
           class="form-control mb-2"
           formControlName="orderCode"
-          placeholder="Example: MG-12345678"
+          placeholder="Example: MG-123456789"
         >
 
-        <label class="form-label">Contact Number</label>
+        <label class="form-label">Customer Name</label>
         <input
           type="text"
           class="form-control mb-3"
-          formControlName="contactNumber"
-          placeholder="Enter your contact number"
+          formControlName="customerName"
+          placeholder="Enter the customer name used in the order"
         >
 
-        <button type="submit" class="btn btn-success w-100" [disabled]="loading">
-          <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          type="submit"
+          class="btn btn-success w-100"
+          [disabled]="loading">
+          <span
+            *ngIf="loading"
+            class="spinner-border spinner-border-sm me-1">
+          </span>
           {{ loading ? 'Checking...' : 'Track Order' }}
         </button>
       </form>
@@ -40,8 +46,13 @@
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
-          <h4 class="mb-1">Reference #: {{ order.orderCode }}</h4>
-          <p class="text-muted mb-0">{{ order.customerName }}</p>
+          <h4 class="mb-1">
+            Reference #: {{ order.orderCode }}
+          </h4>
+
+          <p class="text-muted mb-0">
+            {{ order.customerName }}
+          </p>
         </div>
 
         <span class="badge fs-6" [ngClass]="getStatusClass(order.status)">
@@ -49,7 +60,10 @@
         </span>
       </div>
 
-      <div class="status-timeline mb-4" *ngIf="order.status !== 'Cancelled'">
+      <div
+        class="status-timeline mb-4"
+        *ngIf="order.status !== 'Cancelled'">
+
         <div
           class="status-step"
           *ngFor="let step of statusSteps"
@@ -64,10 +78,35 @@
       </div>
 
       <div class="order-info mb-3">
-        <p><strong>Contact:</strong> {{ order.contactNumber }}</p>
-        <p><strong>Pickup Date:</strong> {{ order.pickupDate }}</p>
-        <p><strong>Pickup Time:</strong> {{ order.pickupTime }}</p>
-        <p><strong>Payment:</strong> {{ order.paymentMethod }}</p>
+        <p>
+          <strong>Customer Name:</strong>
+          {{ order.customerName }}
+        </p>
+
+        <p>
+          <strong>Contact:</strong>
+          {{ order.contactNumber }}
+        </p>
+
+        <p>
+          <strong>Pickup Date:</strong>
+          {{ order.pickupDate }}
+        </p>
+
+        <p>
+          <strong>Pickup Time:</strong>
+          {{ order.pickupTime }}
+        </p>
+
+        <p>
+          <strong>Payment:</strong>
+          {{ order.paymentMethod || 'Pay at Counter' }}
+        </p>
+
+        <p *ngIf="order.notes">
+          <strong>Notes:</strong>
+          {{ order.notes }}
+        </p>
       </div>
 
       <div class="table-responsive">
@@ -75,9 +114,9 @@
           <thead class="table-light">
             <tr>
               <th>Product</th>
-              <th>Qty</th>
-              <th>Price</th>
-              <th>Subtotal</th>
+              <th width="80">Qty</th>
+              <th width="120">Price</th>
+              <th width="120">Subtotal</th>
             </tr>
           </thead>
 

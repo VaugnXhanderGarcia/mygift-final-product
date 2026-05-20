@@ -307,7 +307,10 @@
       <a
   class="btn btn-success w-100 mt-3"
   [routerLink]="['/track-order']"
-  [queryParams]="{ reference: receiptOrder.orderCode || receiptOrder.id }">
+  [queryParams]="{
+    reference: receiptOrder.orderCode || receiptOrder.id,
+    name: receiptOrder.customerName
+  }">
   Track My Order
 </a>
       <div class="countdown-box mt-4">

@@ -31,14 +31,21 @@ export class TrackOrderComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.form = this.fb.group({
       orderCode: ['', Validators.required],
-      contactNumber: ['', Validators.required]
+      customerName: ['', Validators.required]
     });
 
     const reference = this.route.snapshot.queryParamMap.get('reference');
+    const name = this.route.snapshot.queryParamMap.get('name');
 
     if (reference) {
       this.form.patchValue({
         orderCode: reference
+      });
+    }
+
+    if (name) {
+      this.form.patchValue({
+        customerName: name
       });
     }
   }
@@ -57,9 +64,9 @@ export class TrackOrderComponent implements OnInit, OnDestroy {
     this.errorMessage = '';
 
     const orderCode = this.form.value.orderCode;
-    const contactNumber = this.form.value.contactNumber;
+    const customerName = this.form.value.customerName;
 
-    this.orderService.trackOrder(orderCode, contactNumber).subscribe({
+    this.orderService.trackOrder(orderCode, customerName).subscribe({
       next: order => {
         this.loading = false;
         this.order = order;
@@ -72,7 +79,7 @@ export class TrackOrderComponent implements OnInit, OnDestroy {
 
         this.errorMessage =
           error?.error?.message ||
-          'Order not found. Please check your reference number and contact number.';
+          'Order not found. Please check your reference number and customer name.';
       }
     });
   }
@@ -83,9 +90,9 @@ export class TrackOrderComponent implements OnInit, OnDestroy {
     }
 
     const orderCode = this.form.value.orderCode;
-    const contactNumber = this.form.value.contactNumber;
+    const customerName = this.form.value.customerName;
 
-    this.orderService.trackOrder(orderCode, contactNumber).subscribe({
+    this.orderService.trackOrder(orderCode, customerName).subscribe({
       next: order => {
         this.order = order;
       },
