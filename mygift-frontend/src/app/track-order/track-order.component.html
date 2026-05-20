@@ -72,6 +72,7 @@
     <div class="card-body">
       <div *ngIf="order.status === 'Completed'" class="alert alert-success text-center">
         <h4 class="mb-2">Order Completed</h4>
+
         <p class="mb-3">
           Thank you for ordering at MyGift Lemonade and Snack Bar.
           Your order has been completed and claimed successfully.
@@ -84,6 +85,7 @@
 
       <div *ngIf="order.status === 'Cancelled'" class="alert alert-danger text-center">
         <h4 class="mb-2">Order Cancelled</h4>
+
         <p class="mb-0">
           This order has been cancelled.
         </p>
@@ -137,6 +139,11 @@
         </p>
       </div>
 
+      <div class="alert alert-warning" *ngIf="order.items && order.items.length">
+        Please check your order details below. Products marked as
+        <strong>Not Available</strong> were removed from your total.
+      </div>
+
       <div class="table-responsive">
         <table class="table table-bordered align-middle">
           <thead class="table-light">
@@ -149,11 +156,38 @@
           </thead>
 
           <tbody>
-            <tr *ngFor="let item of order.items">
-              <td>{{ item.productName }}</td>
+            <tr
+              *ngFor="let item of order.items || []"
+              [class.table-danger]="item.status === 'Cancelled'">
+
+              <td>
+                {{ item.productName }}
+
+                <div
+                  *ngIf="item.status === 'Cancelled'"
+                  class="text-danger small fw-bold">
+                  This product is not available and was removed from your total.
+                </div>
+              </td>
+
               <td>{{ item.quantity }}</td>
-              <td>₱{{ formatMoney(item.unitPrice) }}</td>
-              <td>₱{{ formatMoney(item.subtotal) }}</td>
+
+              <td>
+                <span
+                  [class.text-decoration-line-through]="item.status === 'Cancelled'">
+                  ₱{{ formatMoney(item.unitPrice) }}
+                </span>
+              </td>
+
+              <td>
+                <span *ngIf="item.status !== 'Cancelled'">
+                  ₱{{ formatMoney(item.subtotal) }}
+                </span>
+
+                <span *ngIf="item.status === 'Cancelled'" class="text-danger fw-bold">
+                  ₱0.00
+                </span>
+              </td>
             </tr>
           </tbody>
         </table>

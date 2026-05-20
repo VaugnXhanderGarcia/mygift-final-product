@@ -9,7 +9,7 @@ export class AdminOrdersComponent implements OnInit {
   orders: any[] = [];
   loading = false;
 
-  preparedItems: { [key: string]: boolean } = {};
+  preparedItems: { [orderId: number]: { [itemId: number]: boolean } } = {};
 
   statuses = [
     'Pending',
@@ -74,6 +74,10 @@ export class AdminOrdersComponent implements OnInit {
     });
   }
 
+  loadOrders(): void {
+    this.load();
+  }
+
   loadPreparedItems(): void {
     this.preparedItems = {};
 
@@ -82,10 +86,19 @@ export class AdminOrdersComponent implements OnInit {
         continue;
       }
 
-      order.items.forEach((item: any, index: number) => {
-        const key = this.getPreparedStorageKey(order, item, index);
-        this.preparedItems[key] = localStorage.getItem(key) === 'true';
-      });
+      for (const item of order.items) {
+        if (!item.id || item.status === 'Cancelled') {
+          continue;
+        }
+
+        const key = this.getPreparedStorageKey(order, item);
+
+        if (!this.preparedItems[order.id]) {
+          this.preparedItems[order.id] = {};
+        }
+
+        this.preparedItems[order.id][item.id] = localStorage.getItem(key) === 'true';
+      }
     }
   }
 
@@ -105,53 +118,91 @@ export class AdminOrdersComponent implements OnInit {
     return this.getOrdersByStatus(status).length;
   }
 
-  updateStatus(order: any, status: string, bypassChecklist = false): void {
-    if (
-      status === 'Ready for Pickup' &&
-      !this.canMoveToReady(order) &&
-      !bypassChecklist
-    ) {
-      this.alertService.error(
-        'Please check all ordered products first, or use Bypass Continue if you need to proceed.'
-      );
+  getActiveItems(order: any): any[] {
+    return (order.items || []).filter((item: any) => item.status !== 'Cancelled');
+  }
+
+  getCancelledItems(order: any): any[] {
+    return (order.items || []).filter((item: any) => item.status === 'Cancelled');
+  }
+
+  hasCancelledItems(order: any): boolean {
+    return this.getCancelledItems(order).length > 0;
+  }
+
+  hasMultipleActiveItems(order: any): boolean {
+    return this.getActiveItems(order).length > 1;
+  }
+
+  togglePreparedItem(order: any, item: any, event: Event): void {
+    const checked = (event.target as HTMLInputElement).checked;
+
+    if (!order?.id || !item?.id) {
       return;
     }
 
-    if (status === order.status) {
+    if (!this.preparedItems[order.id]) {
+      this.preparedItems[order.id] = {};
+    }
+
+    this.preparedItems[order.id][item.id] = checked;
+
+    const key = this.getPreparedStorageKey(order, item);
+
+    if (checked) {
+      localStorage.setItem(key, 'true');
+    } else {
+      localStorage.removeItem(key);
+    }
+  }
+
+  isPreparedItemChecked(order: any, item: any): boolean {
+    if (!order?.id || !item?.id) {
+      return false;
+    }
+
+    return this.preparedItems[order.id]?.[item.id] === true;
+  }
+
+  getPreparedItemIds(order: any): number[] {
+    if (!order?.id || !this.preparedItems[order.id]) {
+      return [];
+    }
+
+    return Object.keys(this.preparedItems[order.id])
+      .filter(itemId => this.preparedItems[order.id][Number(itemId)] === true)
+      .map(itemId => Number(itemId));
+  }
+
+  getPreparedStorageKey(order: any, item: any): string {
+    return `mygift-order-${order.id}-item-${item.id}-prepared`;
+  }
+
+  clearPreparedItems(order: any): void {
+    if (!order?.id || !Array.isArray(order.items)) {
       return;
     }
 
-    if (status === 'Cancelled') {
-      const confirmCancel = confirm(`Cancel order ${order.orderCode}?`);
-
-      if (!confirmCancel) {
-        return;
-      }
+    for (const item of order.items) {
+      const key = this.getPreparedStorageKey(order, item);
+      localStorage.removeItem(key);
     }
 
-    this.orderService.updateStatus(order.id, status).subscribe({
-      next: response => {
-        const updatedOrder = response?.order || {
-          ...order,
-          status
-        };
+    delete this.preparedItems[order.id];
+  }
 
-        this.orders = this.orders.map(existingOrder =>
-          existingOrder.id === order.id ? updatedOrder : existingOrder
-        );
+  canMoveToReady(order: any): boolean {
+    if (order.status !== 'Preparing') {
+      return true;
+    }
 
-        this.selectedStatus = status;
+    const activeItems = this.getActiveItems(order);
 
-        if (status === 'Ready for Pickup') {
-          this.clearPreparedItems(order);
-        }
+    if (activeItems.length <= 1) {
+      return true;
+    }
 
-        this.alertService.success(`Order moved to ${status}.`);
-      },
-      error: error => {
-        this.alertService.error(this.getErrorMessage(error));
-      }
-    });
+    return activeItems.every((item: any) => this.isPreparedItemChecked(order, item));
   }
 
   moveToNextStatus(order: any): void {
@@ -161,7 +212,7 @@ export class AdminOrdersComponent implements OnInit {
     }
 
     if (order.status === 'Preparing') {
-      this.updateStatus(order, 'Ready for Pickup');
+      this.moveToReadyForPickup(order);
       return;
     }
 
@@ -171,16 +222,95 @@ export class AdminOrdersComponent implements OnInit {
     }
   }
 
+  moveToReadyForPickup(order: any): void {
+    if (!this.canMoveToReady(order)) {
+      this.alertService.error(
+        'Please check all ordered products first, or use Bypass Continue.'
+      );
+      return;
+    }
+
+    this.updateStatus(order, 'Ready for Pickup');
+  }
+
   bypassToReadyForPickup(order: any): void {
     const confirmed = confirm(
-      `Bypass product checklist and move order ${order.orderCode} to Ready for Pickup?`
+      'Continue anyway? Unchecked products will be marked as Not Available and removed from the total.'
     );
 
     if (!confirmed) {
       return;
     }
 
-    this.updateStatus(order, 'Ready for Pickup', true);
+    const preparedItemIds = this.getPreparedItemIds(order);
+
+    this.orderService
+      .updateStatus(order.id, 'Ready for Pickup', preparedItemIds, true)
+      .subscribe({
+        next: response => {
+          const updatedOrder = response?.order;
+
+          if (updatedOrder) {
+            this.replaceOrder(updatedOrder);
+          }
+
+          this.clearPreparedItems(order);
+          this.selectedStatus = 'Ready for Pickup';
+
+          this.alertService.success(
+            'Order moved to Ready for Pickup. Unchecked products were marked as Not Available.'
+          );
+        },
+        error: error => {
+          this.alertService.error(
+            this.getErrorMessage(error) || 'Failed to bypass order checklist.'
+          );
+        }
+      });
+  }
+
+  updateStatus(order: any, status: string): void {
+    if (status === 'Cancelled') {
+      const confirmed = confirm(`Cancel order ${order.orderCode}?`);
+
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const preparedItemIds = this.getPreparedItemIds(order);
+
+    this.orderService
+      .updateStatus(order.id, status, preparedItemIds, false)
+      .subscribe({
+        next: response => {
+          const updatedOrder = response?.order;
+
+          if (updatedOrder) {
+            this.replaceOrder(updatedOrder);
+          } else {
+            order.status = status;
+          }
+
+          if (status === 'Ready for Pickup' || status === 'Completed' || status === 'Cancelled') {
+            this.clearPreparedItems(order);
+          }
+
+          this.selectedStatus = status;
+          this.alertService.success('Order status updated successfully.');
+        },
+        error: error => {
+          this.alertService.error(
+            this.getErrorMessage(error) || 'Failed to update order status.'
+          );
+        }
+      });
+  }
+
+  replaceOrder(updatedOrder: any): void {
+    this.orders = this.orders.map(order =>
+      order.id === updatedOrder.id ? updatedOrder : order
+    );
   }
 
   getNextStatusLabel(order: any): string {
@@ -201,72 +331,6 @@ export class AdminOrdersComponent implements OnInit {
 
   canShowNextButton(order: any): boolean {
     return ['Pending', 'Preparing', 'Ready for Pickup'].includes(order.status);
-  }
-
-  hasMultipleItems(order: any): boolean {
-    return Array.isArray(order.items) && order.items.length > 1;
-  }
-
-  canMoveToReady(order: any): boolean {
-    if (order.status !== 'Preparing') {
-      return true;
-    }
-
-    if (!this.hasMultipleItems(order)) {
-      return true;
-    }
-
-    return this.areAllItemsPrepared(order);
-  }
-
-  areAllItemsPrepared(order: any): boolean {
-    if (!Array.isArray(order.items) || order.items.length === 0) {
-      return false;
-    }
-
-    return order.items.every((item: any, index: number) =>
-      this.isItemPrepared(order, item, index)
-    );
-  }
-
-  isItemPrepared(order: any, item: any, index: number): boolean {
-    const key = this.getPreparedStorageKey(order, item, index);
-    return this.preparedItems[key] === true;
-  }
-
-  setItemPrepared(order: any, item: any, index: number, checked: boolean): void {
-    const key = this.getPreparedStorageKey(order, item, index);
-
-    this.preparedItems[key] = checked;
-
-    if (checked) {
-      localStorage.setItem(key, 'true');
-    } else {
-      localStorage.removeItem(key);
-    }
-  }
-
-  clearPreparedItems(order: any): void {
-    if (!Array.isArray(order.items)) {
-      return;
-    }
-
-    order.items.forEach((item: any, index: number) => {
-      const key = this.getPreparedStorageKey(order, item, index);
-      delete this.preparedItems[key];
-      localStorage.removeItem(key);
-    });
-  }
-
-  getPreparedStorageKey(order: any, item: any, index: number): string {
-    const orderId = order.id || order.orderCode;
-    const itemId =
-      item.id ||
-      item.productId ||
-      item.productName ||
-      `item-${index}`;
-
-    return `mygift-order-${orderId}-${itemId}-${index}-prepared`;
   }
 
   getStatusBadgeClass(status: string): string {

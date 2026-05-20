@@ -7,7 +7,11 @@
       </p>
     </div>
 
-    <button class="btn btn-outline-primary" type="button" (click)="load()" [disabled]="loading">
+    <button
+      class="btn btn-outline-primary"
+      type="button"
+      (click)="load()"
+      [disabled]="loading">
       <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
       Refresh
     </button>
@@ -20,11 +24,11 @@
         class="card w-100 text-start shadow-sm h-100"
         [ngClass]="getCardBorderClass(card.status)"
         style="background: white;"
-        (click)="selectStatus(card.status)"
-      >
+        (click)="selectStatus(card.status)">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h6 class="mb-0">{{ card.title }}</h6>
+
             <span class="badge" [ngClass]="getStatusBadgeClass(card.status)">
               {{ getStatusCount(card.status) }}
             </span>
@@ -112,22 +116,32 @@
           </div>
 
           <div
-            *ngIf="order.status === 'Preparing' && hasMultipleItems(order)"
-            class="alert alert-warning py-2"
-          >
+            *ngIf="order.status === 'Preparing' && hasMultipleActiveItems(order)"
+            class="alert alert-warning py-2">
             <strong>Preparation Checklist:</strong>
-            Check each product after preparing it. You can move this order to
-            <strong>Ready for Pickup</strong> after all products are checked, or use
-            <strong>Bypass Continue</strong> if needed.
+            Check each available product after preparing it.
+            If some products are not available, use
+            <strong>Bypass Continue</strong>. Unchecked products will be marked as
+            <strong>Not Available</strong> and removed from the total.
+          </div>
+
+          <div
+            *ngIf="hasCancelledItems(order)"
+            class="alert alert-danger py-2">
+            Some products in this order were marked as
+            <strong>Not Available</strong> and were removed from the total.
           </div>
 
           <div class="table-responsive">
             <table class="table table-bordered align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th style="width: 60px;" *ngIf="order.status === 'Preparing' && hasMultipleItems(order)">
+                  <th
+                    style="width: 70px;"
+                    *ngIf="order.status === 'Preparing' && hasMultipleActiveItems(order)">
                     Done
                   </th>
+
                   <th>Product</th>
                   <th style="width: 100px;">Qty</th>
                   <th style="width: 130px;">Price</th>
@@ -136,34 +150,64 @@
               </thead>
 
               <tbody>
-                <tr *ngFor="let item of order.items; let i = index">
+                <tr
+                  *ngFor="let item of order.items || []"
+                  [class.table-danger]="item.status === 'Cancelled'">
+
                   <td
                     class="text-center"
-                    *ngIf="order.status === 'Preparing' && hasMultipleItems(order)"
-                  >
+                    *ngIf="order.status === 'Preparing' && hasMultipleActiveItems(order)">
                     <input
+                      *ngIf="item.status !== 'Cancelled'"
                       type="checkbox"
                       class="form-check-input"
-                      [checked]="isItemPrepared(order, item, i)"
-                      (change)="setItemPrepared(order, item, i, $any($event.target).checked)"
+                      [checked]="isPreparedItemChecked(order, item)"
+                      (change)="togglePreparedItem(order, item, $event)"
                     />
+
+                    <span *ngIf="item.status === 'Cancelled'" class="badge bg-danger">
+                      N/A
+                    </span>
                   </td>
 
-                  <td>{{ item.productName }}</td>
+                  <td>
+                    {{ item.productName }}
+
+                    <span
+                      *ngIf="item.status === 'Cancelled'"
+                      class="badge bg-danger ms-2">
+                      Not Available
+                    </span>
+                  </td>
+
                   <td>{{ item.quantity }}</td>
-                  <td>₱{{ formatMoney(item.unitPrice) }}</td>
-                  <td>₱{{ formatMoney(item.subtotal) }}</td>
+
+                  <td>
+                    <span
+                      [class.text-decoration-line-through]="item.status === 'Cancelled'">
+                      ₱{{ formatMoney(item.unitPrice) }}
+                    </span>
+                  </td>
+
+                  <td>
+                    <span *ngIf="item.status !== 'Cancelled'">
+                      ₱{{ formatMoney(item.subtotal) }}
+                    </span>
+
+                    <span *ngIf="item.status === 'Cancelled'" class="text-danger fw-bold">
+                      ₱0.00
+                    </span>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
           <div
-            *ngIf="order.status === 'Preparing' && hasMultipleItems(order) && !areAllItemsPrepared(order)"
-            class="alert alert-danger mt-3 mb-0"
-          >
-            Some products are not checked yet. You may finish the checklist or use
-            <strong>Bypass Continue</strong> below.
+            *ngIf="order.status === 'Preparing' && hasMultipleActiveItems(order) && !canMoveToReady(order)"
+            class="alert alert-danger mt-3 mb-0">
+            Some available products are not checked yet. You can finish the checklist
+            or use <strong>Bypass Continue</strong>.
           </div>
         </div>
 
@@ -185,17 +229,15 @@
                 type="button"
                 class="btn btn-success btn-sm"
                 [disabled]="order.status === 'Preparing' && !canMoveToReady(order)"
-                (click)="moveToNextStatus(order)"
-              >
+                (click)="moveToNextStatus(order)">
                 {{ getNextStatusLabel(order) }}
               </button>
 
               <button
-                *ngIf="order.status === 'Preparing' && !canMoveToReady(order)"
+                *ngIf="order.status === 'Preparing' && hasMultipleActiveItems(order) && !canMoveToReady(order)"
                 type="button"
                 class="btn btn-warning btn-sm"
-                (click)="bypassToReadyForPickup(order)"
-              >
+                (click)="bypassToReadyForPickup(order)">
                 Bypass Continue
               </button>
 
@@ -203,8 +245,7 @@
                 *ngIf="order.status !== 'Completed' && order.status !== 'Cancelled'"
                 type="button"
                 class="btn btn-outline-danger btn-sm"
-                (click)="updateStatus(order, 'Cancelled')"
-              >
+                (click)="updateStatus(order, 'Cancelled')">
                 Cancel Order
               </button>
 
@@ -212,8 +253,7 @@
                 *ngIf="order.status === 'Cancelled'"
                 type="button"
                 class="btn btn-outline-secondary btn-sm"
-                (click)="updateStatus(order, 'Pending')"
-              >
+                (click)="updateStatus(order, 'Pending')">
                 Restore to Pending
               </button>
             </div>
