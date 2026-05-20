@@ -15,12 +15,17 @@
 <div class="row g-4">
   <div class="col-lg-8">
     <div class="d-flex flex-wrap gap-2 mb-3">
-      <button *ngFor="let category of categories" type="button" class="btn" [ngClass]="category === selectedCategory ? 'btn-primary' : 'btn-outline-primary'" (click)="selectedCategory = category">{{category}}</button>
+      <button *ngFor="let category of categories" type="button" class="btn" [ngClass]="category === selectedCategory ? 'btn-primary' : 'btn-outline-primary'" (click)="selectedCategory = category">{{ displayCategory(category) }}</button>
     </div>
     <div class="row g-3">
       <div class="col-md-6 col-xl-4" *ngFor="let product of filteredProducts">
         <div class="card h-100 product-card shadow-sm">
-          <img [src]="product.imageUrl" class="card-img-top product-img" alt="{{product.name}}">
+          <img
+  [src]="product.imageUrl"
+  class="card-img-top product-clickable"
+  style="cursor: pointer;"
+  (click)="openProduct(product)"
+>
           <div class="card-body">
             <span class="badge bg-light text-dark mb-2">{{product.category}}</span>
             <h5>{{product.name}}</h5>
@@ -68,4 +73,84 @@
       </div>
     </div>
   </div>
+  <div class="modal-backdrop-custom" *ngIf="selectedProduct">
+  <div class="product-modal card shadow-lg">
+    <div class="card-body">
+      <button
+        type="button"
+        class="btn-close float-end"
+        aria-label="Close"
+        (click)="closeProductModal()">
+      </button>
+
+      <h4 class="mb-2">{{ selectedProduct.name }}</h4>
+
+      <p class="text-muted mb-3">
+        {{ selectedDescription }}
+      </p>
+
+      <p class="fw-bold mb-3">
+        Base Price: ₱{{ selectedProduct.price }}
+      </p>
+
+      <div
+        class="form-check mb-3"
+        *ngIf="isFreshFruitCategory(selectedProduct.category)">
+        <input
+          id="yakultOption"
+          type="checkbox"
+          class="form-check-input"
+          [(ngModel)]="addYakult"
+          name="addYakult">
+        <label for="yakultOption" class="form-check-label">
+          Add Yakult + ₱10
+        </label>
+      </div>
+
+      <div
+        class="mb-3"
+        *ngIf="isHotColdLemonadeCategory(selectedProduct.category)">
+        <label class="form-label fw-semibold">Choose option:</label>
+
+        <div class="d-flex gap-3">
+          <label class="form-check">
+            <input
+              type="radio"
+              class="form-check-input"
+              name="temperature"
+              value="Cold"
+              [(ngModel)]="selectedTemperature">
+            Cold
+          </label>
+
+          <label class="form-check">
+            <input
+              type="radio"
+              class="form-check-input"
+              name="temperature"
+              value="Hot"
+              [(ngModel)]="selectedTemperature">
+            Hot
+          </label>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <button type="button" class="btn btn-outline-secondary" (click)="decreaseSelectedQuantity()">
+          -
+        </button>
+
+        <span class="fw-bold">{{ selectedQuantity }}</span>
+
+        <button type="button" class="btn btn-outline-secondary" (click)="increaseSelectedQuantity()">
+          +
+        </button>
+      </div>
+
+      <button type="button" class="btn btn-success w-100" (click)="confirmAddToCart()">
+        Add to Cart
+      </button>
+    </div>
+  </div>
+</div>
 </div>

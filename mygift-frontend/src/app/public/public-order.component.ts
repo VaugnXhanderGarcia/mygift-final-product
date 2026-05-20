@@ -20,6 +20,12 @@ export class PublicOrderComponent implements OnInit {
   qrUrl = '';
   form!: FormGroup;
 
+  selectedProduct: any = null;
+  selectedDescription = '';
+  selectedQuantity = 1;
+  addYakult = false;
+  selectedTemperature: 'Hot' | 'Cold' = 'Cold';
+
   constructor(
     private fb: FormBuilder,
     private productService: ProductService,
@@ -64,6 +70,22 @@ export class PublicOrderComponent implements OnInit {
     });
   }
 
+  displayCategory(category: string): string {
+    if (category === 'Lemonade') {
+      return 'Fresh Fruits';
+    }
+
+    return category;
+  }
+
+  isFreshFruitCategory(category: string): boolean {
+    return category === 'Lemonade' || category === 'Fresh Fruits';
+  }
+
+  isHotColdLemonadeCategory(category: string): boolean {
+    return category === 'Hot/Cold Lemonade';
+  }
+
   get filteredProducts(): any[] {
     if (this.selectedCategory === 'All') {
       return this.products;
@@ -72,28 +94,118 @@ export class PublicOrderComponent implements OnInit {
     return this.products.filter(product => product.category === this.selectedCategory);
   }
 
-  add(product: any): void {
-    const existingItem = this.cart.find(item => item.productId === product.id);
+  getProductDescription(product: any): string {
+    const name = String(product.name || '').toLowerCase();
+
+    if (name.includes('mango')) {
+      return 'A sweet and refreshing mango drink made with fresh fruit flavor, perfect for a cool and fruity treat.';
+    }
+
+    if (name.includes('strawberry')) {
+      return 'A fruity strawberry drink with a light sweetness and refreshing taste.';
+    }
+
+    if (name.includes('apple')) {
+      return 'A crisp and refreshing apple-flavored drink with a clean fruity taste.';
+    }
+
+    if (name.includes('lemon')) {
+      return 'A refreshing lemonade drink with a balanced sweet and citrus flavor.';
+    }
+
+    if (name.includes('burger')) {
+      return 'A tasty food item best paired with a refreshing drink.';
+    }
+
+    if (name.includes('fries')) {
+      return 'A crispy snack option that is good for sharing or pairing with drinks.';
+    }
+
+    if (this.isFreshFruitCategory(product.category)) {
+      return 'A refreshing fresh fruit drink made for customers who want a sweet and fruity beverage.';
+    }
+
+    if (this.isHotColdLemonadeCategory(product.category)) {
+      return 'A lemonade drink available as hot or cold, depending on your preference.';
+    }
+
+    if (product.category === 'Food') {
+      return 'A food item that pairs well with our drinks.';
+    }
+
+    return 'A delicious MyGift product prepared fresh for every customer.';
+  }
+
+  openProduct(product: any): void {
+    this.selectedProduct = product;
+    this.selectedDescription = this.getProductDescription(product);
+    this.selectedQuantity = 1;
+    this.addYakult = false;
+    this.selectedTemperature = 'Cold';
+  }
+
+  closeProductModal(): void {
+    this.selectedProduct = null;
+    this.selectedDescription = '';
+    this.selectedQuantity = 1;
+    this.addYakult = false;
+    this.selectedTemperature = 'Cold';
+  }
+
+  increaseSelectedQuantity(): void {
+    this.selectedQuantity += 1;
+  }
+
+  decreaseSelectedQuantity(): void {
+    if (this.selectedQuantity > 1) {
+      this.selectedQuantity -= 1;
+    }
+  }
+
+  confirmAddToCart(): void {
+    if (!this.selectedProduct) {
+      return;
+    }
+
+    let finalName = this.selectedProduct.name;
+    let finalPrice = Number(this.selectedProduct.price);
+
+    if (this.isFreshFruitCategory(this.selectedProduct.category) && this.addYakult) {
+      finalName += ' + Yakult';
+      finalPrice += 10;
+    }
+
+    if (this.isHotColdLemonadeCategory(this.selectedProduct.category)) {
+      finalName += ` (${this.selectedTemperature})`;
+    }
+
+    const existingItem = this.cart.find(item => item.productName === finalName);
 
     if (existingItem) {
-      existingItem.quantity += 1;
+      existingItem.quantity += this.selectedQuantity;
       existingItem.subtotal = existingItem.price * existingItem.quantity;
     } else {
       this.cart.push({
-        productId: product.id,
-        productName: product.name,
-        price: Number(product.price),
-        quantity: 1,
-        subtotal: Number(product.price)
+        productId: this.selectedProduct.id,
+        productName: finalName,
+        price: finalPrice,
+        quantity: this.selectedQuantity,
+        subtotal: finalPrice * this.selectedQuantity
       });
     }
+
+    this.closeProductModal();
+  }
+
+  add(product: any): void {
+    this.openProduct(product);
   }
 
   decrease(item: any): void {
     item.quantity -= 1;
 
     if (item.quantity <= 0) {
-      this.cart = this.cart.filter(cartItem => cartItem.productId !== item.productId);
+      this.cart = this.cart.filter(cartItem => cartItem.productName !== item.productName);
     } else {
       item.subtotal = item.price * item.quantity;
     }

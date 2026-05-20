@@ -179,3 +179,28 @@
 .order-panel {
   top: 20px;
 }
+.modal-backdrop-custom {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+  padding: 16px;
+}
+
+.product-modal {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 16px;
+}
+
+.product-clickable {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.product-clickable:hover {
+  transform: scale(1.02);
+  opacity: 0.9;
+}
