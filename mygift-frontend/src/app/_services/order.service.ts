@@ -33,6 +33,24 @@ export class OrderService {
     });
   }
 
+  addOrderItem(orderId: number, item: any) {
+    return this.http.post<any>(`${API_URL}/orders/${orderId}/items`, item);
+  }
+
+  updateOrderItem(orderId: number, itemId: number, item: any) {
+    return this.http.put<any>(
+      `${API_URL}/orders/${orderId}/items/${itemId}`,
+      item
+    );
+  }
+
+  cancelOrderItem(orderId: number, itemId: number) {
+    return this.http.patch<any>(
+      `${API_URL}/orders/${orderId}/items/${itemId}/cancel`,
+      {}
+    );
+  }
+
   trackByReference(orderCode: string, customerName: string) {
     return this.http.get<any>(
       `${API_URL}/orders/track/${encodeURIComponent(orderCode)}?customerName=${encodeURIComponent(customerName)}`

@@ -10,16 +10,11 @@ export class AdminOrdersComponent implements OnInit {
   loading = false;
 
   preparedItems: { [orderId: number]: { [itemId: number]: boolean } } = {};
-
-  statuses = [
-    'Pending',
-    'Preparing',
-    'Ready for Pickup',
-    'Completed',
-    'Cancelled'
-  ];
+  editItems: { [itemId: number]: any } = {};
+  addForms: { [orderId: number]: any } = {};
 
   selectedStatus = 'Pending';
+  editingOrderId: number | null = null;
 
   statusCards = [
     {
@@ -74,10 +69,6 @@ export class AdminOrdersComponent implements OnInit {
     });
   }
 
-  loadOrders(): void {
-    this.load();
-  }
-
   loadPreparedItems(): void {
     this.preparedItems = {};
 
@@ -97,7 +88,8 @@ export class AdminOrdersComponent implements OnInit {
           this.preparedItems[order.id] = {};
         }
 
-        this.preparedItems[order.id][item.id] = localStorage.getItem(key) === 'true';
+        this.preparedItems[order.id][item.id] =
+          localStorage.getItem(key) === 'true';
       }
     }
   }
@@ -130,8 +122,189 @@ export class AdminOrdersComponent implements OnInit {
     return this.getCancelledItems(order).length > 0;
   }
 
-  hasMultipleActiveItems(order: any): boolean {
-    return this.getActiveItems(order).length > 1;
+  canEditOrder(order: any): boolean {
+    return ['Pending', 'Preparing', 'Ready for Pickup'].includes(order.status);
+  }
+
+  startEditOrder(order: any): void {
+    this.editingOrderId = order.id;
+
+    for (const item of order.items || []) {
+      this.editItems[item.id] = {
+        productName: item.productName,
+        quantity: Number(item.quantity || 1),
+        unitPrice: Number(item.unitPrice || 0),
+        status: item.status || 'Active'
+      };
+    }
+
+    this.addForms[order.id] = {
+      productName: '',
+      quantity: 1,
+      unitPrice: 0
+    };
+  }
+
+  stopEditOrder(): void {
+    this.editingOrderId = null;
+  }
+
+  isEditing(order: any): boolean {
+    return this.editingOrderId === order.id;
+  }
+
+  setEditProductName(item: any, value: string): void {
+    this.ensureEditItem(item);
+    this.editItems[item.id].productName = value;
+  }
+
+  setEditQuantity(item: any, value: any): void {
+    this.ensureEditItem(item);
+    this.editItems[item.id].quantity = Number(value || 1);
+  }
+
+  setEditUnitPrice(item: any, value: any): void {
+    this.ensureEditItem(item);
+    this.editItems[item.id].unitPrice = Number(value || 0);
+  }
+
+  ensureEditItem(item: any): void {
+    if (!this.editItems[item.id]) {
+      this.editItems[item.id] = {
+        productName: item.productName,
+        quantity: Number(item.quantity || 1),
+        unitPrice: Number(item.unitPrice || 0),
+        status: item.status || 'Active'
+      };
+    }
+  }
+
+  setAddProductName(order: any, value: string): void {
+    this.ensureAddForm(order);
+    this.addForms[order.id].productName = value;
+  }
+
+  setAddQuantity(order: any, value: any): void {
+    this.ensureAddForm(order);
+    this.addForms[order.id].quantity = Number(value || 1);
+  }
+
+  setAddUnitPrice(order: any, value: any): void {
+    this.ensureAddForm(order);
+    this.addForms[order.id].unitPrice = Number(value || 0);
+  }
+
+  ensureAddForm(order: any): void {
+    if (!this.addForms[order.id]) {
+      this.addForms[order.id] = {
+        productName: '',
+        quantity: 1,
+        unitPrice: 0
+      };
+    }
+  }
+
+  saveItem(order: any, item: any): void {
+    const editItem = this.editItems[item.id];
+
+    if (!editItem) {
+      return;
+    }
+
+    if (!editItem.productName || editItem.quantity <= 0 || editItem.unitPrice < 0) {
+      this.alertService.error('Product name, quantity, and price must be valid.');
+      return;
+    }
+
+    this.orderService.updateOrderItem(order.id, item.id, editItem).subscribe({
+      next: response => {
+        this.handleUpdatedOrder(response?.order);
+        this.alertService.success('Item updated successfully.');
+      },
+      error: error => {
+        this.alertService.error(this.getErrorMessage(error));
+      }
+    });
+  }
+
+  addItem(order: any): void {
+    this.ensureAddForm(order);
+
+    const addForm = this.addForms[order.id];
+
+    if (!addForm.productName || addForm.quantity <= 0 || addForm.unitPrice < 0) {
+      this.alertService.error('Product name, quantity, and price must be valid.');
+      return;
+    }
+
+    this.orderService.addOrderItem(order.id, addForm).subscribe({
+      next: response => {
+        this.handleUpdatedOrder(response?.order);
+
+        this.addForms[order.id] = {
+          productName: '',
+          quantity: 1,
+          unitPrice: 0
+        };
+
+        this.alertService.success('Item added successfully.');
+      },
+      error: error => {
+        this.alertService.error(this.getErrorMessage(error));
+      }
+    });
+  }
+
+  markItemNotAvailable(order: any, item: any): void {
+    const confirmed = confirm(
+      `Mark "${item.productName}" as Not Available and remove it from the total?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.orderService.cancelOrderItem(order.id, item.id).subscribe({
+      next: response => {
+        this.handleUpdatedOrder(response?.order);
+        this.alertService.success('Item marked as Not Available.');
+      },
+      error: error => {
+        this.alertService.error(this.getErrorMessage(error));
+      }
+    });
+  }
+
+  restoreItem(order: any, item: any): void {
+    const restoredItem = {
+      productName: item.productName,
+      quantity: Number(item.quantity || 1),
+      unitPrice: Number(item.unitPrice || 0),
+      status: 'Active'
+    };
+
+    this.orderService.updateOrderItem(order.id, item.id, restoredItem).subscribe({
+      next: response => {
+        this.handleUpdatedOrder(response?.order);
+        this.alertService.success('Item restored successfully.');
+      },
+      error: error => {
+        this.alertService.error(this.getErrorMessage(error));
+      }
+    });
+  }
+
+  handleUpdatedOrder(updatedOrder: any): void {
+    if (!updatedOrder) {
+      this.load();
+      return;
+    }
+
+    this.replaceOrder(updatedOrder);
+
+    if (this.isEditing(updatedOrder)) {
+      this.startEditOrder(updatedOrder);
+    }
   }
 
   togglePreparedItem(order: any, item: any, event: Event): void {
@@ -198,11 +371,13 @@ export class AdminOrdersComponent implements OnInit {
 
     const activeItems = this.getActiveItems(order);
 
-    if (activeItems.length <= 1) {
+    if (activeItems.length === 0) {
       return true;
     }
 
-    return activeItems.every((item: any) => this.isPreparedItemChecked(order, item));
+    return activeItems.every((item: any) =>
+      this.isPreparedItemChecked(order, item)
+    );
   }
 
   moveToNextStatus(order: any): void {
@@ -225,7 +400,7 @@ export class AdminOrdersComponent implements OnInit {
   moveToReadyForPickup(order: any): void {
     if (!this.canMoveToReady(order)) {
       this.alertService.error(
-        'Please check all ordered products first, or use Bypass Continue.'
+        'Please check all available products first, or use Bypass Continue.'
       );
       return;
     }
@@ -235,38 +410,32 @@ export class AdminOrdersComponent implements OnInit {
 
   bypassToReadyForPickup(order: any): void {
     const confirmed = confirm(
-      'Continue anyway? Unchecked products will be marked as Not Available and removed from the total.'
+      'Continue this order to Ready for Pickup? You can still edit or add items after bypassing.'
     );
 
     if (!confirmed) {
       return;
     }
 
-    const preparedItemIds = this.getPreparedItemIds(order);
+    this.orderService.updateStatus(order.id, 'Ready for Pickup', [], true).subscribe({
+      next: response => {
+        const updatedOrder = response?.order;
 
-    this.orderService
-      .updateStatus(order.id, 'Ready for Pickup', preparedItemIds, true)
-      .subscribe({
-        next: response => {
-          const updatedOrder = response?.order;
-
-          if (updatedOrder) {
-            this.replaceOrder(updatedOrder);
-          }
-
-          this.clearPreparedItems(order);
-          this.selectedStatus = 'Ready for Pickup';
-
-          this.alertService.success(
-            'Order moved to Ready for Pickup. Unchecked products were marked as Not Available.'
-          );
-        },
-        error: error => {
-          this.alertService.error(
-            this.getErrorMessage(error) || 'Failed to bypass order checklist.'
-          );
+        if (updatedOrder) {
+          this.replaceOrder(updatedOrder);
         }
-      });
+
+        this.clearPreparedItems(order);
+        this.selectedStatus = 'Ready for Pickup';
+
+        this.alertService.success(
+          'Order moved to Ready for Pickup. You can still edit or add items if needed.'
+        );
+      },
+      error: error => {
+        this.alertService.error(this.getErrorMessage(error));
+      }
+    });
   }
 
   updateStatus(order: any, status: string): void {
@@ -292,7 +461,11 @@ export class AdminOrdersComponent implements OnInit {
             order.status = status;
           }
 
-          if (status === 'Ready for Pickup' || status === 'Completed' || status === 'Cancelled') {
+          if (
+            status === 'Ready for Pickup' ||
+            status === 'Completed' ||
+            status === 'Cancelled'
+          ) {
             this.clearPreparedItems(order);
           }
 
@@ -300,9 +473,7 @@ export class AdminOrdersComponent implements OnInit {
           this.alertService.success('Order status updated successfully.');
         },
         error: error => {
-          this.alertService.error(
-            this.getErrorMessage(error) || 'Failed to update order status.'
-          );
+          this.alertService.error(this.getErrorMessage(error));
         }
       });
   }

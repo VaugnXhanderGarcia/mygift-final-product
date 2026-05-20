@@ -5,12 +5,14 @@ import { db } from '../_helpers/db';
 
 const router = express.Router();
 
-const includeItems = [
-  {
-    model: db.OrderItem,
-    as: 'items'
-  }
-];
+function includeOrderItems() {
+  return [
+    {
+      model: db.OrderItem,
+      as: 'items'
+    }
+  ];
+}
 
 function normalizeName(name: any): string {
   return String(name || '').trim().toLowerCase();
@@ -29,7 +31,7 @@ function makeOrderCode() {
 
 async function getOrderWithItems(orderId: number) {
   return db.Order.findByPk(orderId, {
-    include: includeItems
+    include: includeOrderItems()
   });
 }
 
@@ -82,7 +84,7 @@ router.post('/public', async (req, res, next) => {
       });
     }
 
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
       await transaction.rollback();
 
       return res.status(400).json({
@@ -109,12 +111,6 @@ router.post('/public', async (req, res, next) => {
       });
     }
 
-    let totalAmount = 0;
-
-    for (const item of items) {
-      totalAmount += Number(item.price) * Number(item.quantity);
-    }
-
     const order = await db.Order.create(
       {
         orderCode: makeOrderCode(),
@@ -123,7 +119,7 @@ router.post('/public', async (req, res, next) => {
         pickupDate,
         pickupTime,
         notes: notes || '',
-        totalAmount,
+        totalAmount: 0,
         status: 'Pending',
         paymentMethod: 'Pay at Counter',
         paymentStatus: 'Unpaid'
@@ -131,20 +127,31 @@ router.post('/public', async (req, res, next) => {
       { transaction }
     );
 
+    let totalAmount = 0;
+
     for (const item of items) {
+      const quantity = Number(item.quantity || 1);
+      const unitPrice = Number(item.price || item.unitPrice || 0);
+      const subtotal = unitPrice * quantity;
+
+      totalAmount += subtotal;
+
       await db.OrderItem.create(
         {
           orderId: order.id,
-          productId: item.productId,
+          productId: Number(item.productId || 0),
           productName: item.productName,
-          unitPrice: Number(item.price),
-          quantity: Number(item.quantity),
-          subtotal: Number(item.price) * Number(item.quantity),
+          quantity,
+          unitPrice,
+          subtotal,
           status: 'Active'
         },
         { transaction }
       );
     }
+
+    order.totalAmount = totalAmount;
+    await order.save({ transaction });
 
     await transaction.commit();
 
@@ -167,7 +174,7 @@ router.post('/public', async (req, res, next) => {
 
 /**
  * PUBLIC: TRACK BY NAME ONLY
- * GET /orders/track-by-name?customerName=vaugn
+ * GET /orders/track-by-name?customerName=Juan
  */
 router.get('/track-by-name', async (req, res, next) => {
   try {
@@ -186,7 +193,7 @@ router.get('/track-by-name', async (req, res, next) => {
         },
         [Op.and]: [customerNameWhere(customerName)]
       },
-      include: includeItems,
+      include: includeOrderItems(),
       order: [['createdAt', 'DESC']]
     });
 
@@ -196,7 +203,7 @@ router.get('/track-by-name', async (req, res, next) => {
       });
     }
 
-    res.json(order);
+    return res.json(order);
   } catch (error) {
     next(error);
   }
@@ -204,7 +211,7 @@ router.get('/track-by-name', async (req, res, next) => {
 
 /**
  * PUBLIC: TRACK BY REFERENCE + NAME
- * GET /orders/track/:orderCode?customerName=vaugn
+ * GET /orders/track/:orderCode?customerName=Juan
  */
 router.get('/track/:orderCode', async (req, res, next) => {
   try {
@@ -222,7 +229,7 @@ router.get('/track/:orderCode', async (req, res, next) => {
         orderCode,
         [Op.and]: [customerNameWhere(customerName)]
       },
-      include: includeItems
+      include: includeOrderItems()
     });
 
     if (!order) {
@@ -231,7 +238,7 @@ router.get('/track/:orderCode', async (req, res, next) => {
       });
     }
 
-    res.json(order);
+    return res.json(order);
   } catch (error) {
     next(error);
   }
@@ -244,11 +251,11 @@ router.get('/track/:orderCode', async (req, res, next) => {
 router.get('/', authorize, async (req, res, next) => {
   try {
     const orders = await db.Order.findAll({
-      include: includeItems,
+      include: includeOrderItems(),
       order: [['createdAt', 'DESC']]
     });
 
-    res.json(orders);
+    return res.json(orders);
   } catch (error) {
     next(error);
   }
@@ -263,7 +270,7 @@ router.put('/:id/status', authorize, async (req, res, next) => {
 
   try {
     const order = await db.Order.findByPk(req.params.id, {
-      include: includeItems,
+      include: includeOrderItems(),
       transaction
     });
 
@@ -275,7 +282,8 @@ router.put('/:id/status', authorize, async (req, res, next) => {
       });
     }
 
-    const nextStatus = req.body.status;
+    const nextStatus = String(req.body.status || '').trim();
+
     const preparedItemIds = Array.isArray(req.body.preparedItemIds)
       ? req.body.preparedItemIds.map((id: any) => Number(id))
       : [];
@@ -298,7 +306,8 @@ router.put('/:id/status', authorize, async (req, res, next) => {
       });
     }
 
-    const activeItems = order.items.filter((item: any) => item.status !== 'Cancelled');
+    const orderItems = (order as any).items || [];
+    const activeItems = orderItems.filter((item: any) => item.status !== 'Cancelled');
 
     if (order.status === 'Preparing' && nextStatus === 'Ready for Pickup') {
       const uncheckedItems = activeItems.filter(
@@ -309,16 +318,16 @@ router.put('/:id/status', authorize, async (req, res, next) => {
         await transaction.rollback();
 
         return res.status(400).json({
-          message: 'Please check all ordered products first, or use Bypass Continue.'
+          message: 'Please check all available products first, or use Bypass Continue.'
         });
       }
 
-      if (uncheckedItems.length > 0 && bypassChecklist) {
-        for (const item of uncheckedItems) {
-          item.status = 'Cancelled';
-          await item.save({ transaction });
-        }
-      }
+      /*
+        Important:
+        If bypassChecklist is true, this route only moves the order forward.
+        It does not cancel unchecked products anymore.
+        Admin can manually edit, add, or mark items as Not Available after bypass.
+      */
     }
 
     if (nextStatus === 'Cancelled') {
@@ -337,8 +346,242 @@ router.put('/:id/status', authorize, async (req, res, next) => {
 
     const updatedOrder = await getOrderWithItems(order.id);
 
-    res.json({
+    return res.json({
       message: 'Order status updated successfully.',
+      order: updatedOrder
+    });
+  } catch (error) {
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+
+    next(error);
+  }
+});
+
+/**
+ * ADMIN: ADD ITEM TO ORDER
+ * POST /orders/:orderId/items
+ */
+router.post('/:orderId/items', authorize, async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    const order = await db.Order.findByPk(req.params.orderId, { transaction });
+
+    if (!order) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        message: 'Order not found.'
+      });
+    }
+
+    if (order.status === 'Completed' || order.status === 'Cancelled') {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'You cannot add items to completed or cancelled orders.'
+      });
+    }
+
+    const productName = String(req.body.productName || '').trim();
+    const quantity = Number(req.body.quantity || 1);
+    const unitPrice = Number(req.body.unitPrice || req.body.price || 0);
+
+    if (!productName) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'Product name is required.'
+      });
+    }
+
+    if (quantity <= 0 || unitPrice < 0) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'Quantity and price must be valid.'
+      });
+    }
+
+    await db.OrderItem.create(
+      {
+        orderId: order.id,
+        productId: Number(req.body.productId || 0),
+        productName,
+        quantity,
+        unitPrice,
+        subtotal: quantity * unitPrice,
+        status: 'Active'
+      },
+      { transaction }
+    );
+
+    await recalculateOrderTotal(order.id, transaction);
+
+    await transaction.commit();
+
+    const updatedOrder = await getOrderWithItems(order.id);
+
+    return res.json({
+      message: 'Item added successfully.',
+      order: updatedOrder
+    });
+  } catch (error) {
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+
+    next(error);
+  }
+});
+
+/**
+ * ADMIN: UPDATE ORDER ITEM
+ * PUT /orders/:orderId/items/:itemId
+ */
+router.put('/:orderId/items/:itemId', authorize, async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    const order = await db.Order.findByPk(req.params.orderId, { transaction });
+
+    if (!order) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        message: 'Order not found.'
+      });
+    }
+
+    if (order.status === 'Completed' || order.status === 'Cancelled') {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'You cannot edit completed or cancelled orders.'
+      });
+    }
+
+    const item = await db.OrderItem.findOne({
+      where: {
+        id: req.params.itemId,
+        orderId: req.params.orderId
+      },
+      transaction
+    });
+
+    if (!item) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        message: 'Order item not found.'
+      });
+    }
+
+    const productName = String(req.body.productName || item.productName).trim();
+    const quantity = Number(req.body.quantity || item.quantity);
+    const unitPrice = Number(req.body.unitPrice || item.unitPrice);
+    const status = String(req.body.status || item.status || 'Active');
+
+    const validItemStatuses = ['Active', 'Cancelled'];
+
+    if (!validItemStatuses.includes(status)) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'Invalid item status.'
+      });
+    }
+
+    if (!productName || quantity <= 0 || unitPrice < 0) {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'Product name, quantity, and price must be valid.'
+      });
+    }
+
+    item.productName = productName;
+    item.quantity = quantity;
+    item.unitPrice = unitPrice;
+    item.subtotal = quantity * unitPrice;
+    item.status = status;
+
+    await item.save({ transaction });
+
+    await recalculateOrderTotal(order.id, transaction);
+
+    await transaction.commit();
+
+    const updatedOrder = await getOrderWithItems(order.id);
+
+    return res.json({
+      message: 'Item updated successfully.',
+      order: updatedOrder
+    });
+  } catch (error) {
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
+
+    next(error);
+  }
+});
+
+/**
+ * ADMIN: MARK ITEM AS NOT AVAILABLE
+ * PATCH /orders/:orderId/items/:itemId/cancel
+ */
+router.patch('/:orderId/items/:itemId/cancel', authorize, async (req, res, next) => {
+  const transaction = await db.sequelize.transaction();
+
+  try {
+    const order = await db.Order.findByPk(req.params.orderId, { transaction });
+
+    if (!order) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        message: 'Order not found.'
+      });
+    }
+
+    if (order.status === 'Completed' || order.status === 'Cancelled') {
+      await transaction.rollback();
+
+      return res.status(400).json({
+        message: 'You cannot edit completed or cancelled orders.'
+      });
+    }
+
+    const item = await db.OrderItem.findOne({
+      where: {
+        id: req.params.itemId,
+        orderId: req.params.orderId
+      },
+      transaction
+    });
+
+    if (!item) {
+      await transaction.rollback();
+
+      return res.status(404).json({
+        message: 'Order item not found.'
+      });
+    }
+
+    item.status = 'Cancelled';
+    await item.save({ transaction });
+
+    await recalculateOrderTotal(order.id, transaction);
+
+    await transaction.commit();
+
+    const updatedOrder = await getOrderWithItems(order.id);
+
+    return res.json({
+      message: 'Item marked as Not Available.',
       order: updatedOrder
     });
   } catch (error) {
