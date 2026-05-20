@@ -1,79 +1,335 @@
-<section class="mygift-hero-banner mb-4">
-  <div class="hero-overlay">
-    <div class="hero-content">
-      <h1>MyGift Lemonade and Snack Bar</h1>
-      <p>Scan, choose your lemonade or snacks, reserve pickup time, and pay at the counter.</p>
-    </div>
+<ng-container *ngIf="screen === 'order'">
+  <section class="mygift-hero-banner mb-4">
+    <div class="hero-overlay">
+      <div class="hero-content">
+        <h1>MyGift Lemonade and Snack Bar</h1>
+        <p>Scan, choose your lemonade or snacks, reserve pickup time, and pay at the counter.</p>
+      </div>
 
-    <div class="hero-qr-box">
-      <img [src]="qrUrl" alt="Customer Ordering QR">
-      <div>Customer Ordering QR</div>
+      <div class="hero-qr-box">
+        <img [src]="qrUrl" alt="Customer Ordering QR">
+        <div>Customer Ordering QR</div>
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<div class="row g-4">
-  <div class="col-lg-8">
-    <div class="d-flex flex-wrap gap-2 mb-3">
-      <button *ngFor="let category of categories" type="button" class="btn" [ngClass]="category === selectedCategory ? 'btn-primary' : 'btn-outline-primary'" (click)="selectedCategory = category">{{ displayCategory(category) }}</button>
-    </div>
-    <div class="row g-3">
-      <div class="col-md-6 col-xl-4" *ngFor="let product of filteredProducts">
-        <div class="card h-100 product-card shadow-sm">
-          <img
-  [src]="product.imageUrl"
-  class="card-img-top product-clickable"
-  style="cursor: pointer;"
-  (click)="openProduct(product)"
->
-          <div class="card-body">
-            <span class="badge bg-light text-dark mb-2">{{product.category}}</span>
-            <h5>{{product.name}}</h5>
-            <p class="text-muted small">{{product.description}}</p>
-            <div class="d-flex justify-content-between align-items-center">
-              <strong>₱{{product.price}}</strong>
-              <button class="btn btn-sm btn-primary" (click)="add(product)">Add</button>
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <button
+          *ngFor="let category of categories"
+          type="button"
+          class="btn"
+          [ngClass]="category === selectedCategory ? 'btn-primary' : 'btn-outline-primary'"
+          (click)="selectedCategory = category">
+          {{ displayCategory(category) }}
+        </button>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6 col-xl-4" *ngFor="let product of filteredProducts">
+          <div class="card h-100 product-card shadow-sm">
+            <img
+              [src]="product.imageUrl"
+              class="card-img-top product-clickable"
+              style="cursor: pointer;"
+              (click)="openProduct(product)"
+              alt="{{ product.name }}"
+            >
+
+            <div class="card-body">
+              <span class="badge bg-light text-dark mb-2">
+                {{ displayCategory(product.category) }}
+              </span>
+
+              <h5>{{ product.name }}</h5>
+
+              <p class="text-muted small">
+                {{ product.description || getProductDescription(product) }}
+              </p>
+
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>₱{{ product.price }}</strong>
+
+                <button
+                  type="button"
+                  class="btn btn-sm btn-primary"
+                  (click)="add(product)">
+                  Add
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="col-lg-4">
-    <div class="card shadow sticky-top order-panel">
+    <!-- ORDER PANEL -->
+    <div class="col-lg-4">
+      <div class="card shadow sticky-top order-panel">
+        <div class="card-body">
+          <h4>Reservation Details</h4>
+
+          <form [formGroup]="form" (ngSubmit)="submit()">
+            <input
+              class="form-control mb-2"
+              formControlName="customerName"
+              placeholder="Customer name"
+            >
+
+            <input
+              class="form-control mb-2"
+              formControlName="contactNumber"
+              placeholder="Contact number"
+            >
+
+            <label class="form-label small">Pickup date</label>
+            <input
+              class="form-control mb-2"
+              type="date"
+              formControlName="pickupDate"
+            >
+
+            <label class="form-label small">Pickup time</label>
+            <input
+              class="form-control mb-2"
+              type="time"
+              formControlName="pickupTime"
+            >
+
+            <textarea
+              class="form-control mb-3"
+              rows="2"
+              formControlName="notes"
+              placeholder="Notes or customization request">
+            </textarea>
+
+            <div *ngIf="cart.length === 0" class="alert alert-light border">
+              No selected items yet.
+            </div>
+
+            <div
+              *ngFor="let item of cart"
+              class="d-flex justify-content-between align-items-center border-bottom py-2">
+              <div>
+                <strong>{{ item.productName }}</strong>
+                <br>
+                <small>₱{{ item.price }} x {{ item.quantity }}</small>
+              </div>
+
+              <div class="btn-group btn-group-sm">
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary"
+                  (click)="decrease(item)">
+                  -
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary"
+                  (click)="increaseCartItem(item)">
+                  +
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-outline-danger"
+                  (click)="removeCartItem(item)">
+                  x
+                </button>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-3 fs-5">
+              <strong>Total</strong>
+              <strong>₱{{ total() }}</strong>
+            </div>
+
+            <div class="alert alert-info small mt-3 mb-3">
+              Payment method: Pay at the counter upon claiming.
+            </div>
+
+            <button
+              type="submit"
+              class="btn btn-success w-100"
+              [disabled]="loading">
+              Review Order
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+<!-- REVIEW / CONFIRM ORDER PAGE -->
+<ng-container *ngIf="screen === 'review'">
+  <div class="review-wrapper">
+    <div class="card review-card shadow-sm">
       <div class="card-body">
-        <h4>Reservation Details</h4>
-        <form [formGroup]="form" (ngSubmit)="submit()">
-          <input class="form-control mb-2" formControlName="customerName" placeholder="Customer name">
-          <input class="form-control mb-2" formControlName="contactNumber" placeholder="Contact number">
-          <label class="form-label small">Pickup date</label>
-          <input class="form-control mb-2" type="date" formControlName="pickupDate">
-          <label class="form-label small">Pickup time</label>
-          <input class="form-control mb-2" type="time" formControlName="pickupTime">
-          <textarea class="form-control mb-3" rows="2" formControlName="notes" placeholder="Notes or customization request"></textarea>
+        <h2 class="text-center mb-3">Confirm Your Order</h2>
 
-          <div *ngIf="cart.length === 0" class="alert alert-light border">No selected items yet.</div>
-          <div *ngFor="let item of cart" class="d-flex justify-content-between align-items-center border-bottom py-2">
-            <div><strong>{{item.productName}}</strong><br><small>₱{{item.price}} x {{item.quantity}}</small></div>
-            <div class="btn-group btn-group-sm">
-              <button type="button" class="btn btn-outline-secondary" (click)="decrease(item)">-</button>
-              <button type="button" class="btn btn-outline-secondary" (click)="add({ id: item.productId, name: item.productName, price: item.price })">+</button>
+        <p class="text-muted text-center mb-4">
+          Please review your details before finishing your order.
+        </p>
+
+        <div class="customer-review mb-4">
+          <h5>Customer Details</h5>
+
+          <p><strong>Name:</strong> {{ form.value.customerName }}</p>
+          <p><strong>Contact Number:</strong> {{ form.value.contactNumber }}</p>
+          <p><strong>Pickup Date:</strong> {{ form.value.pickupDate }}</p>
+          <p><strong>Pickup Time:</strong> {{ form.value.pickupTime }}</p>
+          <p *ngIf="form.value.notes">
+            <strong>Notes:</strong> {{ form.value.notes }}
+          </p>
+        </div>
+
+        <div class="order-review mb-4">
+          <h5>Order Details</h5>
+
+          <div class="review-item" *ngFor="let item of cart">
+            <div>
+              <strong>{{ item.productName }}</strong>
+              <div class="text-muted">
+                ₱{{ item.price }} x {{ item.quantity }}
+              </div>
+            </div>
+
+            <div class="review-actions">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                (click)="decrease(item)">
+                -
+              </button>
+
+              <span class="mx-2">{{ item.quantity }}</span>
+
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                (click)="increaseCartItem(item)">
+                +
+              </button>
+
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger ms-2"
+                (click)="removeCartItem(item)">
+                Remove
+              </button>
+            </div>
+
+            <div class="fw-bold">
+              ₱{{ item.price * item.quantity }}
             </div>
           </div>
+        </div>
 
-          <div class="d-flex justify-content-between mt-3 fs-5"><strong>Total</strong><strong>₱{{total()}}</strong></div>
-          <div class="alert alert-info small mt-3 mb-3">Payment method: Pay at the counter upon claiming.</div>
-          <button class="btn btn-success w-100" [disabled]="loading">{{loading ? 'Submitting...' : 'Reserve Order'}}</button>
-        </form>
+        <div class="review-total">
+          <span>Total</span>
+          <strong>₱{{ total() }}</strong>
+        </div>
 
-        <div *ngIf="submittedOrder" class="alert alert-success mt-3">
-          Reservation received. Reference #: {{submittedOrder.id}}
+        <div class="d-flex gap-2 mt-4">
+          <button
+            type="button"
+            class="btn btn-outline-success w-50"
+            (click)="backToOrder()">
+            Add / Edit Order
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-success w-50"
+            [disabled]="loading"
+            (click)="finishOrder()">
+            <span
+              *ngIf="loading"
+              class="spinner-border spinner-border-sm me-1">
+            </span>
+            {{ loading ? 'Submitting...' : 'Finish Order' }}
+          </button>
         </div>
       </div>
     </div>
   </div>
-  <div class="modal-backdrop-custom" *ngIf="selectedProduct">
+</ng-container>
+
+<!-- RECEIPT PAGE -->
+<ng-container *ngIf="screen === 'receipt' && receiptOrder">
+  <div class="receipt-wrapper">
+    <div class="receipt-card shadow">
+      <div class="receipt-header">
+        <h2>MyGift</h2>
+        <p>Order Receipt</p>
+      </div>
+
+      <div class="receipt-reference">
+        Reference No.
+        <strong>#{{ receiptOrder.id }}</strong>
+      </div>
+
+      <div class="receipt-info">
+        <p><strong>Name:</strong> {{ receiptOrder.customerName }}</p>
+        <p><strong>Contact:</strong> {{ receiptOrder.contactNumber }}</p>
+        <p>
+          <strong>Pickup:</strong>
+          {{ receiptOrder.pickupDate }} at {{ receiptOrder.pickupTime }}
+        </p>
+        <p><strong>Date Ordered:</strong> {{ getReceiptDate() }}</p>
+      </div>
+
+      <hr>
+
+      <div class="receipt-item" *ngFor="let item of receiptOrder.items">
+        <div>
+          <strong>{{ item.productName }}</strong>
+          <small>₱{{ item.price }} x {{ item.quantity }}</small>
+        </div>
+
+        <span>₱{{ item.price * item.quantity }}</span>
+      </div>
+
+      <hr>
+
+      <div class="receipt-total">
+        <span>Total</span>
+        <strong>₱{{ total() }}</strong>
+      </div>
+
+      <div class="receipt-message mt-3">
+        Thank you for your order. Please screenshot or save this receipt.
+      </div>
+
+      <div class="countdown-box mt-4">
+        <p>
+          Starting a new order in <strong>{{ countdown }}</strong> seconds...
+        </p>
+
+        <div class="progress">
+          <div
+            class="progress-bar"
+            role="progressbar"
+            [style.width.%]="countdown * 10">
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-outline-success w-100 mt-3"
+          (click)="skipReceiptTimer()">
+          Skip and Start New Order
+        </button>
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+<!-- PRODUCT DETAILS MODAL -->
+<div class="modal-backdrop-custom" *ngIf="selectedProduct">
   <div class="product-modal card shadow-lg">
     <div class="card-body">
       <button
@@ -102,6 +358,7 @@
           class="form-check-input"
           [(ngModel)]="addYakult"
           name="addYakult">
+
         <label for="yakultOption" class="form-check-label">
           Add Yakult + ₱10
         </label>
@@ -136,21 +393,29 @@
       </div>
 
       <div class="d-flex align-items-center gap-3 mb-3">
-        <button type="button" class="btn btn-outline-secondary" (click)="decreaseSelectedQuantity()">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          (click)="decreaseSelectedQuantity()">
           -
         </button>
 
         <span class="fw-bold">{{ selectedQuantity }}</span>
 
-        <button type="button" class="btn btn-outline-secondary" (click)="increaseSelectedQuantity()">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          (click)="increaseSelectedQuantity()">
           +
         </button>
       </div>
 
-      <button type="button" class="btn btn-success w-100" (click)="confirmAddToCart()">
+      <button
+        type="button"
+        class="btn btn-success w-100"
+        (click)="confirmAddToCart()">
         Add to Cart
       </button>
     </div>
   </div>
-</div>
 </div>
