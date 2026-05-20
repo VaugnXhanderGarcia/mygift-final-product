@@ -5,32 +5,30 @@ import { OrderService } from '../_services/order.service';
 
 @Component({
   selector: 'app-public-order',
-  templateUrl: './public-order.component.html',
-  styleUrls: ['./public-order.component.css']
+  templateUrl: './public-order.component.html'
 })
 export class PublicOrderComponent implements OnInit, OnDestroy {
   products: any[] = [];
-  categories: string[] = ['All'];
   selectedCategory = 'All';
 
   cart: any[] = [];
-  submittedOrder: any = null;
-  receiptOrder: any = null;
+  form!: FormGroup;
 
   loading = false;
-  qrUrl = '';
-
-  screen: 'order' | 'review' | 'receipt' = 'order';
-  countdown = 10;
-  receiptTimer: any = null;
-
-  form!: FormGroup;
+  reviewMode = false;
 
   selectedProduct: any = null;
   selectedDescription = '';
   selectedQuantity = 1;
   addYakult = false;
-  selectedTemperature: 'Hot' | 'Cold' = 'Cold';
+  selectedTemperature = 'Cold';
+
+  receiptOrder: any = null;
+  receiptItems: any[] = [];
+  receiptCountdown = 10;
+  private receiptTimer: any = null;
+
+  qrUrl = '';
 
   constructor(
     private fb: FormBuilder,
@@ -47,7 +45,11 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
       notes: ['']
     });
 
-    this.generateQrCode();
+    const orderingUrl = window.location.origin + '/';
+    this.qrUrl =
+      'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' +
+      encodeURIComponent(orderingUrl);
+
     this.loadProducts();
   }
 
@@ -55,21 +57,10 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     this.clearReceiptTimer();
   }
 
-  generateQrCode(): void {
-    const customerOrderUrl = window.location.origin + '/';
-
-    this.qrUrl =
-      'https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=' +
-      encodeURIComponent(customerOrderUrl);
-  }
-
   loadProducts(): void {
     this.productService.getAll().subscribe({
       next: (products: any[]) => {
         this.products = products || [];
-
-        const categorySet = new Set(this.products.map(product => product.category));
-        this.categories = ['All', ...Array.from(categorySet)];
       },
       error: () => {
         alert('Failed to load products. Please make sure backend is running.');
@@ -77,24 +68,9 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     });
   }
 
-  displayCategory(category: string): string {
-    if (category === 'Lemonade') {
-      return 'Fresh Fruits';
-    }
-
-    return category;
-  }
-
-  isProductAvailable(product: any): boolean {
-    return product?.isAvailable === true;
-  }
-
-  isFreshFruitCategory(category: string): boolean {
-    return category === 'Lemonade' || category === 'Fresh Fruits';
-  }
-
-  isHotColdLemonadeCategory(category: string): boolean {
-    return category === 'Hot/Cold Lemonade';
+  get categories(): string[] {
+    const categorySet = new Set(this.products.map(product => product.category));
+    return ['All', ...Array.from(categorySet)];
   }
 
   get filteredProducts(): any[] {
@@ -105,53 +81,68 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     return this.products.filter(product => product.category === this.selectedCategory);
   }
 
+  displayCategory(category: string): string {
+    if (!category) {
+      return '';
+    }
+
+    const value = category.toLowerCase().trim();
+
+    if (value === 'lemonade') {
+      return 'Fresh Fruits';
+    }
+
+    return category;
+  }
+
   getProductDescription(product: any): string {
-    if (product.description) {
+    const name = String(product?.name || '').toLowerCase();
+
+    if (product?.description) {
       return product.description;
     }
 
-    const name = String(product.name || '').toLowerCase();
-
-    if (name.includes('mango')) {
-      return 'A sweet and refreshing mango drink made with fresh fruit flavor.';
+    if (name.includes('watermelon')) {
+      return 'A refreshing fruit drink made for a sweet and cool taste.';
     }
 
-    if (name.includes('strawberry')) {
-      return 'A fruity strawberry drink with a light sweetness and refreshing taste.';
+    if (name.includes('blueberry')) {
+      return 'A sweet and fruity drink with a smooth berry flavor.';
     }
 
-    if (name.includes('apple')) {
-      return 'A crisp and refreshing apple-flavored drink with a clean fruity taste.';
+    if (name.includes('carrot')) {
+      return 'A fresh fruit drink with a light, healthy, and refreshing taste.';
     }
 
     if (name.includes('lemon')) {
-      return 'A refreshing lemonade drink with a balanced sweet and citrus flavor.';
+      return 'A classic lemonade drink with a refreshing citrus flavor.';
     }
 
-    if (name.includes('burger')) {
-      return 'A tasty food item best paired with a refreshing drink.';
+    if (name.includes('food') || name.includes('snack')) {
+      return 'A tasty snack that pairs well with your selected drink.';
     }
 
-    if (name.includes('fries')) {
-      return 'A crispy snack option good for sharing or pairing with drinks.';
-    }
+    return 'A fresh and affordable MyGift product made for quick pickup orders.';
+  }
 
-    if (this.isFreshFruitCategory(product.category)) {
-      return 'A refreshing fresh fruit drink made for customers who want a sweet and fruity beverage.';
-    }
+  isFreshFruitCategory(category: string): boolean {
+    const value = String(category || '').toLowerCase().trim();
 
-    if (this.isHotColdLemonadeCategory(product.category)) {
-      return 'A lemonade drink available as hot or cold, depending on your preference.';
-    }
+    return value === 'lemonade' || value.includes('fresh fruit');
+  }
 
-    if (product.category === 'Food') {
-      return 'A food item that pairs well with our drinks.';
-    }
+  isHotColdLemonadeCategory(category: string): boolean {
+    const value = String(category || '').toLowerCase().trim();
 
-    return 'A delicious MyGift product prepared fresh for every customer.';
+    return value.includes('hot') || value.includes('cold');
   }
 
   openProduct(product: any): void {
+    if (product?.isAvailable === false) {
+      alert('This product is currently not available.');
+      return;
+    }
+
     this.selectedProduct = product;
     this.selectedDescription = this.getProductDescription(product);
     this.selectedQuantity = 1;
@@ -161,10 +152,6 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
 
   closeProductModal(): void {
     this.selectedProduct = null;
-    this.selectedDescription = '';
-    this.selectedQuantity = 1;
-    this.addYakult = false;
-    this.selectedTemperature = 'Cold';
   }
 
   increaseSelectedQuantity(): void {
@@ -182,57 +169,61 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (!this.isProductAvailable(this.selectedProduct)) {
-      alert('This product is currently not available.');
-      return;
-    }
-
-    let finalName = this.selectedProduct.name;
-    let finalPrice = Number(this.selectedProduct.price);
+    let productName = this.selectedProduct.name;
+    let price = Number(this.selectedProduct.price);
 
     if (this.isFreshFruitCategory(this.selectedProduct.category) && this.addYakult) {
-      finalName += ' + Yakult';
-      finalPrice += 10;
+      productName += ' + Yakult';
+      price += 10;
     }
 
     if (this.isHotColdLemonadeCategory(this.selectedProduct.category)) {
-      finalName += ` (${this.selectedTemperature})`;
+      productName += ` (${this.selectedTemperature})`;
     }
 
-    const existingItem = this.cart.find(item => item.productName === finalName);
-
-    if (existingItem) {
-      existingItem.quantity += this.selectedQuantity;
-      existingItem.subtotal = existingItem.price * existingItem.quantity;
-    } else {
-      this.cart.push({
-        productId: this.selectedProduct.id,
-        productName: finalName,
-        price: finalPrice,
-        quantity: this.selectedQuantity,
-        subtotal: finalPrice * this.selectedQuantity
-      });
-    }
+    this.addToCart({
+      productId: this.selectedProduct.id,
+      productName,
+      price,
+      quantity: this.selectedQuantity
+    });
 
     this.closeProductModal();
   }
 
   add(product: any): void {
-    if (!this.isProductAvailable(product)) {
+    if (product?.isAvailable === false) {
       alert('This product is currently not available.');
       return;
     }
 
-    this.openProduct(product);
+    this.addToCart({
+      productId: product.id,
+      productName: product.name,
+      price: Number(product.price),
+      quantity: 1
+    });
   }
 
-  decrease(item: any): void {
-    item.quantity -= 1;
+  addToCart(newItem: any): void {
+    const existingItem = this.cart.find(
+      item =>
+        item.productId === newItem.productId &&
+        item.productName === newItem.productName &&
+        Number(item.price) === Number(newItem.price)
+    );
 
-    if (item.quantity <= 0) {
-      this.cart = this.cart.filter(cartItem => cartItem.productName !== item.productName);
+    if (existingItem) {
+      existingItem.quantity += Number(newItem.quantity);
+      existingItem.subtotal = existingItem.price * existingItem.quantity;
     } else {
-      item.subtotal = item.price * item.quantity;
+      this.cart.push({
+        productId: newItem.productId,
+        productName: newItem.productName,
+        price: Number(newItem.price),
+        quantity: Number(newItem.quantity),
+        subtotal: Number(newItem.price) * Number(newItem.quantity)
+      });
     }
   }
 
@@ -241,36 +232,28 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     item.subtotal = item.price * item.quantity;
   }
 
-  removeCartItem(item: any): void {
-    this.cart = this.cart.filter(cartItem => cartItem.productName !== item.productName);
+  decrease(item: any): void {
+    item.quantity -= 1;
+
+    if (item.quantity <= 0) {
+      this.remove(item);
+    } else {
+      item.subtotal = item.price * item.quantity;
+    }
+  }
+
+  remove(item: any): void {
+    this.cart = this.cart.filter(cartItem => cartItem !== item);
   }
 
   total(): number {
-    return this.cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  }
-
-  buildOrderPayload(): any {
-    return {
-      customerName: this.form.value.customerName,
-      contactNumber: this.form.value.contactNumber,
-      pickupDate: this.form.value.pickupDate,
-      pickupTime: this.form.value.pickupTime,
-      notes: this.form.value.notes || '',
-      items: this.cart.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        price: Number(item.price),
-        quantity: Number(item.quantity)
-      }))
-    };
-  }
-
-  submit(): void {
-    this.reviewOrder();
+    return this.cart.reduce(
+      (sum, item) => sum + Number(item.price) * Number(item.quantity),
+      0
+    );
   }
 
   reviewOrder(): void {
-    this.submittedOrder = null;
     this.receiptOrder = null;
 
     if (this.form.invalid) {
@@ -280,48 +263,75 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
     }
 
     if (this.cart.length === 0) {
-      alert('Please select at least one available product.');
+      alert('Please select at least one product.');
       return;
     }
 
-    this.screen = 'review';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.reviewMode = true;
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   }
 
-  backToOrder(): void {
-    this.screen = 'order';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  editOrder(): void {
+    this.reviewMode = false;
   }
 
-  finishOrder(): void {
-    if (this.form.invalid || this.cart.length === 0) {
-      this.backToOrder();
+  confirmOrder(): void {
+    if (this.loading) {
       return;
     }
 
-    const payload = this.buildOrderPayload();
+    const currentForm = this.form.getRawValue();
+    const currentItems = this.cart.map(item => ({ ...item }));
+    const currentTotal = this.total();
+
+    const payload = {
+      customerName: currentForm.customerName,
+      contactNumber: currentForm.contactNumber,
+      pickupDate: currentForm.pickupDate,
+      pickupTime: currentForm.pickupTime,
+      notes: currentForm.notes || '',
+      totalAmount: currentTotal,
+      items: currentItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        price: Number(item.price),
+        quantity: Number(item.quantity)
+      }))
+    };
 
     this.loading = true;
 
     this.orderService.createPublic(payload).subscribe({
       next: (response: any) => {
-        this.loading = false;
-
-        const savedOrder = response.order || response;
+        const order = response?.order || response;
 
         this.receiptOrder = {
-          ...payload,
-          ...savedOrder,
-          id: savedOrder.id,
-          orderCode: savedOrder.orderCode,
-          items: payload.items,
-          createdAt: new Date()
+          ...order,
+          id: response?.id || order?.id,
+          orderCode: response?.orderCode || order?.orderCode || response?.id || order?.id,
+          customerName: currentForm.customerName,
+          contactNumber: currentForm.contactNumber,
+          pickupDate: currentForm.pickupDate,
+          pickupTime: currentForm.pickupTime,
+          notes: currentForm.notes || '',
+          totalAmount: currentTotal,
+          paymentMethod: order?.paymentMethod || 'Pay at Counter',
+          paymentStatus: order?.paymentStatus || 'Unpaid',
+          status: order?.status || 'Pending'
         };
 
-        this.screen = 'receipt';
-        this.startReceiptCountdown();
+        this.receiptItems = currentItems;
+        this.reviewMode = false;
+        this.loading = false;
 
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.form.reset();
+        this.cart = [];
+
+        this.startReceiptCountdown();
       },
       error: (error: any) => {
         this.loading = false;
@@ -329,7 +339,7 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
 
         alert(
           error?.error?.message ||
-          'Order failed. Please make sure the backend is running.'
+            'Order failed. Please make sure the backend is running.'
         );
       }
     });
@@ -337,12 +347,12 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
 
   startReceiptCountdown(): void {
     this.clearReceiptTimer();
-    this.countdown = 10;
+    this.receiptCountdown = 10;
 
     this.receiptTimer = setInterval(() => {
-      this.countdown -= 1;
+      this.receiptCountdown -= 1;
 
-      if (this.countdown <= 0) {
+      if (this.receiptCountdown <= 0) {
         this.startNewOrder();
       }
     }, 1000);
@@ -357,23 +367,10 @@ export class PublicOrderComponent implements OnInit, OnDestroy {
 
   startNewOrder(): void {
     this.clearReceiptTimer();
-
-    this.form.reset();
-    this.cart = [];
-    this.submittedOrder = null;
     this.receiptOrder = null;
-    this.selectedCategory = 'All';
+    this.receiptItems = [];
+    this.receiptCountdown = 10;
+    this.reviewMode = false;
     this.loading = false;
-    this.screen = 'order';
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  skipReceiptTimer(): void {
-    this.startNewOrder();
-  }
-
-  getReceiptDate(): string {
-    return new Date().toLocaleString();
   }
 }
