@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 const API_URL =
   window.location.hostname === 'localhost'
     ? 'http://localhost:4000'
-    : 'https://mygift-frontend.onrender.com';
+    : 'https://mygift-backend.onrender.com';
 
 @Injectable({
   providedIn: 'root'
